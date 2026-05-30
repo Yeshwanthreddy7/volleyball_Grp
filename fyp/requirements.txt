@@ -1,0 +1,16 @@
+# Core computer-vision dependencies
+opencv-python>=4.8.0
+numpy>=1.24.0
+pandas>=2.0.0
+
+# Deep learning – Mamba model
+torch>=2.1.0
+
+# Player detection (YOLOv8) – used by pipeline.py
+ultralytics>=8.0.0
+
+# Player tracking (ByteTrack) – used by pipeline.py
+supervision>=0.18.0
+
+# Optional: GPU acceleration (install the CUDA build of PyTorch instead)
+# See: https://pytorch.org/get-started/locally/

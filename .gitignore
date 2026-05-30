@@ -1,0 +1,42 @@
+# Dataset folders (exclude from version control)
+dataset/
+training_csv/
+
+# Python environment
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*.swn
+*.sublime-project
+*.sublime-workspace
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Output files (optional - remove if you want to track these)
+*.mp4
+*.csv
+training_history*.csv
+final_*.mp4
+final_*.csv
+smoke_*.mp4
+smoke_*.csv
+mamba_checkpoint*.pt
+
+# Logs and temporary files
+*.log
+*.tmp
+error.txt
