@@ -3,6 +3,11 @@ opencv-python>=4.8.0
 numpy>=1.24.0
 pandas>=2.0.0
 
+# Optimal identity assignment (features.recover_identity – Hungarian matcher).
+# A greedy fallback runs automatically if SciPy is absent, but SciPy is
+# recommended for best identity recovery.
+scipy>=1.10.0
+
 # Deep learning – Mamba model
 torch>=2.1.0
 

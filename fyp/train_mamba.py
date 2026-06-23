@@ -40,6 +40,12 @@ from mamba_model import (
     NUM_CLASSES,
     MambaClassifier,
 )
+from features import build_model_sequence
+
+# Court width used for the horizontal-mirror augmentation (matches the
+# pipeline's 1800 cm convention; mirroring left<->right is label-preserving for
+# all four tactical classes).
+COURT_W_CM = 1800.0
 
 
 # ---------------------------------------------------------------------------
@@ -113,7 +119,11 @@ class VolleyballDataset(Dataset):
     """
 
     def __init__(self, directory: str) -> None:
-        self.samples: list[tuple[torch.Tensor, int]] = []
+        # Each sample stores the RAW (T,14) clip + label.  The corrected,
+        # identity-aware, permutation-invariant model input is built on demand
+        # via features.build_model_sequence(), so train/inference parity is
+        # guaranteed and augmentation can be applied at the raw-coordinate level.
+        self.samples: list[tuple[np.ndarray, int]] = []
         self.label_to_idx = {name: i for i, name in enumerate(LABEL_NAMES)}
 
         csv_files = [f for f in os.listdir(directory) if f.lower().endswith(".csv")]
@@ -147,30 +157,44 @@ class VolleyballDataset(Dataset):
                 skipped += 1
                 continue
 
-            label_idx = self.label_to_idx[label_str]
-
-            features = df[FEATURE_COLS].values.astype(np.float32)  # (T, 14)
-            # Pad or truncate to exactly 29 frames
-            target_len = 29
-            if len(features) < target_len:
-                pad = np.zeros((target_len - len(features), INPUT_DIM), dtype=np.float32)
-                features = np.vstack([features, pad])
-            else:
-                features = features[:target_len]
-
-            seq_tensor = torch.from_numpy(features)                  # (29, 14)
-            self.samples.append((seq_tensor, label_idx))
+            raw = df[FEATURE_COLS].values.astype(np.float32)  # (T, 14) raw soup
+            self.samples.append((raw, self.label_to_idx[label_str]))
 
         print(
             f"Loaded {len(self.samples)} samples from '{directory}' "
             f"({skipped} skipped)."
         )
 
+    def build(self, idx: int, augment: bool = False,
+              jitter_cm: float = 15.0, mirror_p: float = 0.5) -> torch.Tensor:
+        """Build the corrected (29,14) model input for sample `idx`.
+
+        When `augment` is True, label-preserving augmentation is applied to the
+        RAW coordinates *before* feature extraction:
+          • Gaussian position jitter (camera/detector noise model).
+          • Random horizontal mirror about the court centre line.
+        Both are valid for every tactical class and act as strong regularisers
+        on the small dataset.
+        """
+        raw, _ = self.samples[idx]
+        raw = raw.copy()
+        if augment:
+            coords = raw.reshape(len(raw), 7, 2)          # ball + 6 players
+            valid = ~np.all(coords == 0.0, axis=-1)        # don't perturb sentinels
+            if jitter_cm > 0:
+                noise = np.random.normal(0, jitter_cm, size=coords.shape).astype(np.float32)
+                coords[valid] += noise[valid]
+            if np.random.rand() < mirror_p:
+                coords[..., 0][valid] = COURT_W_CM - coords[..., 0][valid]
+            raw = coords.reshape(len(raw), 14)
+        seq = build_model_sequence(raw, target_len=29)     # (29,14) corrected
+        return torch.from_numpy(seq)
+
     def __len__(self) -> int:
         return len(self.samples)
 
     def __getitem__(self, idx: int) -> tuple[torch.Tensor, int]:
-        return self.samples[idx]
+        return self.build(idx, augment=False), self.samples[idx][1]
 
 
 # ---------------------------------------------------------------------------
@@ -181,8 +205,9 @@ def compute_normalization(
     dataset: VolleyballDataset,
     train_indices: list[int],
 ) -> tuple[torch.Tensor, torch.Tensor]:
-    """Return per-feature mean and std computed over training sequences."""
-    seqs = torch.stack([dataset.samples[i][0] for i in train_indices])  # (N, 29, 14)
+    """Return per-feature mean and std computed over (un-augmented) training
+    sequences, built through the corrected feature pipeline."""
+    seqs = torch.stack([dataset.build(i, augment=False) for i in train_indices])  # (N,29,14)
     mean = seqs.mean(dim=(0, 1))   # (14,)
     std = seqs.std(dim=(0, 1)).clamp(min=MIN_STD)
     return mean, std
@@ -269,7 +294,8 @@ def label_distribution(dataset: VolleyballDataset, indices: list[int]) -> dict[s
 
 
 class NormWrapper(Dataset):
-    """Wraps a dataset and applies per-feature z-score normalisation."""
+    """Wraps a dataset, builds the corrected sequence (optionally augmented for
+    the training split) and applies per-feature z-score normalisation."""
 
     def __init__(
         self,
@@ -277,17 +303,21 @@ class NormWrapper(Dataset):
         indices: list[int],
         mean: torch.Tensor,
         std: torch.Tensor,
+        augment: bool = False,
     ) -> None:
         self.base = base
         self.indices = indices
         self.mean = mean
         self.std = std
+        self.augment = augment
 
     def __len__(self) -> int:
         return len(self.indices)
 
     def __getitem__(self, i: int) -> tuple[torch.Tensor, int]:
-        seq, label = self.base.samples[self.indices[i]]
+        idx = self.indices[i]
+        seq = self.base.build(idx, augment=self.augment)
+        label = self.base.samples[idx][1]
         return (seq - self.mean) / self.std, label
 
 
@@ -413,7 +443,7 @@ def train(args: argparse.Namespace) -> None:
 
     mean, std = compute_normalization(full_dataset, train_indices)
 
-    train_ds = NormWrapper(full_dataset, train_indices, mean, std)
+    train_ds = NormWrapper(full_dataset, train_indices, mean, std, augment=args.augment)
     val_ds = NormWrapper(full_dataset, val_indices, mean, std) if n_val > 0 else None
     test_ds = NormWrapper(full_dataset, test_indices, mean, std) if n_test > 0 else None
 
@@ -526,6 +556,10 @@ def train(args: argparse.Namespace) -> None:
                     "args": vars(args),
                     "label_names": LABEL_NAMES,
                     "best_val_macro_f1": best_val_macro_f1,
+                    # Tags the input representation. Loaders refuse / warn if an
+                    # old checkpoint (raw-coordinate features) is used with the
+                    # new permutation-invariant pipeline.
+                    "feature_version": "perm_invariant_v1",
                 },
                 args.checkpoint,
             )
@@ -623,6 +657,13 @@ def _parse_args() -> argparse.Namespace:
         type=int,
         default=0,
         help="DataLoader worker processes.",
+    )
+    parser.add_argument(
+        "--augment",
+        action="store_true",
+        help="Enable label-preserving augmentation (position jitter + horizontal "
+             "mirror) on the training split. Strongly recommended on this small "
+             "dataset to reduce overfitting.",
     )
     parser.add_argument("--seed", type=int, default=42,      help="Random seed.")
     # Output

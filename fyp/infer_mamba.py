@@ -33,6 +33,7 @@ import torch.nn.functional as F
 
 from mamba_model import FEATURE_COLS, INPUT_DIM, LABEL_NAMES, MambaClassifier
 from label_clips import LABEL_TO_INDEX, generate_report
+from features import build_model_sequence
 
 
 # ---------------------------------------------------------------------------
@@ -42,6 +43,12 @@ from label_clips import LABEL_TO_INDEX, generate_report
 def _load_checkpoint(path: str, device: torch.device) -> tuple[MambaClassifier, torch.Tensor, torch.Tensor]:
     """Load a checkpoint and return (model, norm_mean, norm_std)."""
     ckpt = torch.load(path, map_location=device, weights_only=False)
+    if ckpt.get("feature_version") != "perm_invariant_v1":
+        print(
+            "[WARNING] Checkpoint predates the permutation-invariant feature "
+            "pipeline; predictions will be INVALID. Retrain with train_mamba.py.",
+            file=sys.stderr,
+        )
     saved_args = ckpt.get("args", {})
 
     model = MambaClassifier(
@@ -75,17 +82,14 @@ def _prepare_sequence(df: pd.DataFrame) -> torch.Tensor | None:
     if "frame_id" in df.columns:
         df = df[df["frame_id"] <= 29]
 
-    features = df[FEATURE_COLS].values.astype(np.float32)
-    target_len = 29
-    if len(features) == 0:
+    raw = df[FEATURE_COLS].values.astype(np.float32)
+    if len(raw) == 0:
         return None
-    if len(features) < target_len:
-        pad = np.zeros((target_len - len(features), INPUT_DIM), dtype=np.float32)
-        features = np.vstack([features, pad])
-    else:
-        features = features[:target_len]
 
-    return torch.from_numpy(features)  # (29, 14)
+    # Build the corrected, identity-aware, permutation-invariant model input –
+    # identical to what train_mamba.py and pipeline.py feed the network.
+    seq = build_model_sequence(raw, target_len=29)
+    return torch.from_numpy(seq)  # (29, 14)
 
 
 # ---------------------------------------------------------------------------

@@ -1,42 +1,20 @@
-# Dataset folders (exclude from version control)
-dataset/
-training_csv/
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
 
-# Python environment
+# Virtual environment (recreate on each machine - never commit)
 .venv/
 venv/
 env/
-__pycache__/
-*.py[cod]
-*$py.class
-*.egg-info/
-dist/
-build/
 
-# IDE and editor files
-.vscode/
-.idea/
-*.swp
-*.swo
-*.swn
-*.sublime-project
-*.sublime-workspace
+# Large media - transfer separately, not via git
+*.mp4
+*.avi
+*.mov
+*.mkv
 
-# OS files
+# OS junk
 .DS_Store
 Thumbs.db
-
-# Output files (optional - remove if you want to track these)
-*.mp4
-*.csv
-training_history*.csv
-final_*.mp4
-final_*.csv
-smoke_*.mp4
-smoke_*.csv
-mamba_checkpoint*.pt
-
-# Logs and temporary files
-*.log
-*.tmp
-error.txt

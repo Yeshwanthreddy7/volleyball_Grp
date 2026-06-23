@@ -1,0 +1,2 @@
+sequence,frame_start,frame_end,label,label_index,confidence,sync_score,mean_spacing_cm,centroid_vel_cm_per_frame,p_Spacing Breakdown,p_Delayed Support,p_Coordinated Attack,p_Coordinated Defense
+1,1,29,Coordinated Attack,1,0.7633,0.0022,324.2,79.78,0.0609,0.14,0.7633,0.0358

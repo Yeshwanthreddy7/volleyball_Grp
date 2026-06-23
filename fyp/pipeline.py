@@ -71,7 +71,14 @@ except ImportError:  # pragma: no cover
     HAS_SUPERVISION = False
 
 from mamba_model import FEATURE_COLS, INPUT_DIM, LABEL_NAMES, MambaClassifier
-from label_clips import LABEL_TO_INDEX, generate_report, _compute_sync_score, label_clip
+from label_clips import LABEL_TO_INDEX, generate_report, label_clip
+from features import (
+    build_model_sequence,
+    raw_frame_to_arrays,
+    recover_identity,
+    sync_score as _id_sync_score,
+    convex_hull_area,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -133,6 +140,14 @@ def _load_mamba(
 ) -> tuple[MambaClassifier, torch.Tensor, torch.Tensor]:
     """Load a Mamba checkpoint; return (model, norm_mean, norm_std)."""
     ckpt = torch.load(path, map_location=device, weights_only=False)
+    if ckpt.get("feature_version") != "perm_invariant_v1":
+        print(
+            "[WARNING] Checkpoint was trained on the OLD raw-coordinate features.\n"
+            "          The pipeline now feeds permutation-invariant features, so\n"
+            "          predictions from this checkpoint will be INVALID.\n"
+            "          Retrain with train_mamba.py (it tags new checkpoints).",
+            file=sys.stderr,
+        )
     saved_args = ckpt.get("args", {})
     model = MambaClassifier(
         input_dim=saved_args.get("input_dim", INPUT_DIM),
@@ -407,44 +422,63 @@ def _extract_positions(
     frame_w: int,
     frame_h: int,
     H: np.ndarray | None,
-    track_age: dict[int, int],
+    slot_map: dict[int, int],
 ) -> tuple[np.ndarray, np.ndarray]:
     """
-    Convert ByteTrack bounding-box centroids to court coordinates.
+    Convert ByteTrack detections to court coordinates with a STABLE, identity-
+    consistent slot assignment.
 
-    Always returns exactly N_PLAYERS player positions (padded with zeros
-    when fewer tracks are available).
+    Loophole fixed (L1 – identity swap)
+    -----------------------------------
+    The previous implementation re-sorted every track by "age" on *every frame*
+    and packed them into slots 0..5 in that order.  Because ages change as
+    tracks appear/disappear, the player occupying a given slot kept changing,
+    so the per-slot velocity / sync features were computed across DIFFERENT
+    physical players – i.e. they were noise.
 
-    Parameters
-    ----------
-    tracks     : ByteTrack output Detections
-    ball_center: pixel (x, y) of ball, or None
-    track_age  : mutable dict accumulating per-ID frame counts (for
-                 stability-based player slot assignment)
+    This version keeps a persistent ``slot_map: {tracker_id -> slot}``.  Once a
+    ByteTrack ID is given a slot it keeps it for the whole clip; a slot is only
+    reused after its track has been gone.  Column ``p_i`` is therefore the same
+    player across the entire sequence.
+
+    Loophole fixed (L2 – (0,0) sentinel)  &  foot-point (distance bias)
+    ------------------------------------------------------------------
+    Absent players are returned as NaN (not (0,0), which is a real court
+    corner), and player ground position is taken at the FEET (bottom-centre of
+    the bounding box) rather than the box centroid, which removes a
+    perspective-dependent position bias.
 
     Returns
     -------
-    player_positions : (6, 2) court cm coordinates
-    ball_pos         : (2,) court cm coordinates  (0,0 if ball unknown)
+    player_positions : (6, 2) court-cm coords; NaN rows for empty slots.
+    ball_pos         : (2,) court-cm coords; NaN if ball unknown.
     """
-    # Accumulate track ages so older (more stable) tracks get priority slots
-    if tracks.tracker_id is not None:
-        for tid in tracks.tracker_id:
-            track_age[int(tid)] = track_age.get(int(tid), 0) + 1
-
-    # Collect bounding-box centres per active track ID
-    centers: dict[int, tuple[float, float]] = {}
+    # Foot point (bottom-centre) per active track ID.
+    feet: dict[int, tuple[float, float]] = {}
     if tracks.tracker_id is not None and len(tracks.xyxy) > 0:
         for tid, (x1, y1, x2, y2) in zip(tracks.tracker_id, tracks.xyxy):
-            centers[int(tid)] = ((x1 + x2) / 2.0, (y1 + y2) / 2.0)
+            feet[int(tid)] = ((x1 + x2) / 2.0, y2)  # foot = bottom-centre
 
-    # Sort by descending age → assign most stable N_PLAYERS to fixed slots
-    chosen = sorted(centers.keys(), key=lambda t: track_age.get(t, 0), reverse=True)
-    chosen = chosen[:N_PLAYERS]
+    # Persistent slot assignment: keep existing slots, fill free slots for new IDs.
+    used_slots = {s for s in slot_map.values()}
+    for tid in feet:
+        if tid not in slot_map:
+            free = next((s for s in range(N_PLAYERS) if s not in used_slots), None)
+            if free is not None:
+                slot_map[tid] = free
+                used_slots.add(free)
 
-    player_positions = np.zeros((N_PLAYERS, 2), dtype=float)
-    for slot, tid in enumerate(chosen):
-        px, py = centers[tid]
+    # Release slots whose track is no longer visible so they can be reused later.
+    for tid in [t for t in slot_map if t not in feet]:
+        # keep the mapping but allow its slot to be reclaimed once another new
+        # track needs it: simplest correct behaviour is to drop stale IDs.
+        del slot_map[tid]
+
+    player_positions = np.full((N_PLAYERS, 2), np.nan, dtype=float)
+    for tid, (px, py) in feet.items():
+        slot = slot_map.get(tid)
+        if slot is None:
+            continue
         cx, cy = _pixel_to_court(px, py, frame_w, frame_h, H)
         player_positions[slot] = [cx, cy]
 
@@ -453,10 +487,11 @@ def _extract_positions(
         bx, by = _pixel_to_court(
             float(ball_center[0]), float(ball_center[1]), frame_w, frame_h, H
         )
+        ball_pos = np.array([bx, by], dtype=float)
     else:
-        bx, by = 0.0, 0.0
+        ball_pos = np.array([np.nan, np.nan], dtype=float)
 
-    return player_positions, np.array([bx, by], dtype=float)
+    return player_positions, ball_pos
 
 
 # ---------------------------------------------------------------------------
@@ -491,35 +526,36 @@ def _compute_frame_features(
 
 def _sequence_metrics(seq: np.ndarray) -> dict[str, float]:
     """
-    Compute descriptive metrics for a 29-frame sequence.
+    Compute descriptive metrics for a 29-frame raw sequence.
 
-    Returns a dict with:
-      sync_score     – movement synchronization (mean cosine similarity)
-      mean_spacing   – average nearest-neighbour spacing (cm)
-      centroid_vel   – mean team centroid velocity (cm/frame)
+    All metrics are now computed on IDENTITY-CONSISTENT tracks (via
+    features.recover_identity) and ignore missing (NaN) slots, so sync_score
+    and centroid velocity are no longer corrupted by slot-swapping or by the
+    legacy (0,0) sentinel.
     """
-    # Player positions: columns 2..13, reshape to (29, 6, 2)
-    positions = seq[:, 2:].reshape(len(seq), N_PLAYERS, 2)
+    players, _ = raw_frame_to_arrays(seq)          # (T,6,2), NaN = missing
+    tracked = recover_identity(players)            # fix identity (L1)
 
-    # Sync score
-    sync = _compute_sync_score(positions)
+    sync = _id_sync_score(tracked)
 
-    # Mean nearest-neighbour spacing per frame (skip zero-padded slots).
-    # Vectorised: compute all pairwise distances per frame with NumPy broadcasting.
+    # Mean nearest-neighbour spacing per frame (present players only).
     spacing_samples: list[float] = []
-    for pos_frame in positions:
-        occupied = pos_frame[~np.all(pos_frame == 0, axis=1)]  # (k, 2)
-        if len(occupied) < 2:
+    for pos_frame in tracked:
+        occ = pos_frame[~np.isnan(pos_frame).any(axis=1)]
+        if len(occ) < 2:
             continue
-        diff = occupied[:, np.newaxis, :] - occupied[np.newaxis, :, :]  # (k, k, 2)
-        dists = np.linalg.norm(diff, axis=-1)                           # (k, k)
-        np.fill_diagonal(dists, np.inf)
-        spacing_samples.extend(dists.min(axis=-1).tolist())
+        d = np.linalg.norm(occ[:, None, :] - occ[None, :, :], axis=-1)
+        np.fill_diagonal(d, np.inf)
+        spacing_samples.extend(d.min(axis=-1).tolist())
     mean_spacing = float(np.mean(spacing_samples)) if spacing_samples else 0.0
 
-    # Team centroid velocity (frame-to-frame)
-    centroid = positions.mean(axis=1)  # (29, 2)
-    centroid_vel = float(np.linalg.norm(np.diff(centroid, axis=0), axis=1).mean())
+    # Team centroid velocity using nan-aware per-frame centroid.
+    centroids = np.array([
+        np.nanmean(f, axis=0) if (~np.isnan(f).any(axis=1)).any() else [np.nan, np.nan]
+        for f in tracked
+    ])
+    cvel = np.linalg.norm(np.diff(centroids, axis=0), axis=1)
+    centroid_vel = float(np.nanmean(cvel)) if np.isfinite(cvel).any() else 0.0
 
     return {
         "sync_score": round(sync, 4),
@@ -575,7 +611,9 @@ def _classify_sequence_rule_based(seq: np.ndarray) -> tuple[str, int, float, Non
     confidence : 1.0 (rule-based decisions are deterministic)
     probs      : None  (no probability vector in rule-based mode)
     """
-    df = pd.DataFrame(seq, columns=FEATURE_COLS)
+    # The legacy rule engine expects the (0,0) sentinel for missing, not NaN.
+    seq_legacy = np.nan_to_num(seq, nan=0.0)
+    df = pd.DataFrame(seq_legacy, columns=FEATURE_COLS)
     df.insert(0, "frame_id", range(1, len(df) + 1))
     label = label_clip(df)
     if label == "Unclassified":
@@ -861,8 +899,8 @@ def run_pipeline(args: argparse.Namespace) -> None:
             print(f"  Output video: {args.output_video}")
 
     # ── State variables ──────────────────────────────────────────────────────
-    seq_buffer: list[np.ndarray] = []   # accumulates (14,) rows → 29 frames
-    track_age: dict[int, int] = {}      # track_id → number of frames seen
+    seq_buffer: list[np.ndarray] = []   # accumulates (14,) raw rows → 29 frames
+    slot_map: dict[int, int] = {}       # track_id → persistent player slot (L1 fix)
     ball_tracker = BallTracker()        # constant-velocity ball tracker
     ball_trail: deque[tuple[int, int, bool]] = deque(maxlen=BALL_TRAIL_LEN)
     label_counts: dict[str, int] = defaultdict(int)
@@ -876,11 +914,19 @@ def run_pipeline(args: argparse.Namespace) -> None:
     print("\nProcessing frames…")
 
     # ── Main frame loop ──────────────────────────────────────────────────────
+    if args.start_frame > 0:
+        cap.set(cv2.CAP_PROP_POS_FRAMES, args.start_frame)
+        frame_idx = args.start_frame
+        print(f"Seeking to start frame {args.start_frame}.")
+
     while True:
         ret, frame = cap.read()
         if not ret:
             break
         frame_idx += 1
+        if args.max_frames and (frame_idx - args.start_frame) > args.max_frames:
+            print(f"Reached --max-frames limit ({args.max_frames}); stopping.")
+            break
 
         # ── STEP 1 – Frame Extraction (implicit in cap.read) ────────────────
         # ── STEP 2 – Player Detection (YOLOv8) ─────────────────────────────
@@ -908,7 +954,7 @@ def run_pipeline(args: argparse.Namespace) -> None:
 
         # ── STEP 4 – Pose / Position Extraction ─────────────────────────────
         player_positions, ball_pos = _extract_positions(
-            tracks, tracked_ball, frame_w, frame_h, H, track_age
+            tracks, tracked_ball, frame_w, frame_h, H, slot_map
         )
 
         # ── STEP 5 – Feature Engineering ────────────────────────────────────
@@ -922,10 +968,14 @@ def run_pipeline(args: argparse.Namespace) -> None:
             # Derived metrics (for output CSV)
             metrics = _sequence_metrics(seq_array)
 
-            # Mamba classification or rule-based fallback
+            # Mamba classification or rule-based fallback.
+            # The model consumes the corrected, identity-aware, permutation-
+            # invariant representation – built here so the live pipeline and the
+            # trainer see byte-for-byte identical inputs (train/serve parity).
             if model is not None:
+                model_seq = build_model_sequence(seq_array, target_len=SEQ_LEN)
                 label, numeric_idx, conf, probs = _classify_sequence(
-                    seq_array, model, norm_mean, norm_std, device
+                    model_seq, model, norm_mean, norm_std, device
                 )
             else:
                 label, numeric_idx, conf, probs = _classify_sequence_rule_based(seq_array)
@@ -1088,6 +1138,19 @@ def _parse_args() -> argparse.Namespace:
         "--output-csv",
         default="",
         help="Path to save per-sequence predictions as a CSV (skipped if empty).",
+    )
+    parser.add_argument(
+        "--start-frame",
+        type=int,
+        default=0,
+        help="Skip to this frame index before processing (for rendering a segment).",
+    )
+    parser.add_argument(
+        "--max-frames",
+        type=int,
+        default=0,
+        help="Process at most this many frames (0 = whole video). Use a few "
+             "hundred to render a short annotated sample quickly.",
     )
     return parser.parse_args()
 
