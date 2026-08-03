@@ -76,9 +76,11 @@ PLAYER_COLS = [
 ]
 N_PLAYERS = len(PLAYER_COLS)
 
-# Numeric index → label string mapping (1-based, as per output specification).
-# Read as: LABEL_INDEX[1] == "Coordinated Attack"
+# Numeric index → label string mapping (as per output specification).
+# Index 0 is the noise-sink class: dead-ball / transition / out-of-play
+# windows that must not be forced into a tactical class (spec §4B).
 LABEL_INDEX: dict[int, str] = {
+    0: "Unclassified",
     1: "Coordinated Attack",
     2: "Coordinated Defense",
     3: "Delayed Support",
@@ -193,9 +195,14 @@ def generate_report(label_counts: dict) -> str:
     n_cd = label_counts.get("Coordinated Defense", 0)
     n_ds = label_counts.get("Delayed Support", 0)
     n_sb = label_counts.get("Spacing Breakdown", 0)
+    n_uc = label_counts.get("Unclassified", 0)
 
+    # Efficiency is computed over TACTICAL windows only: dead-ball /
+    # transition windows (class 0) say nothing about coordination quality
+    # and must not dilute the score.
+    tactical_total = total - n_uc
     coordinated = n_ca + n_cd
-    efficiency = round(coordinated / total * 100) if total > 0 else 0
+    efficiency = round(coordinated / tactical_total * 100) if tactical_total > 0 else 0
 
     def _bar(n: int, tot: int, width: int = 20) -> str:
         if tot == 0:
@@ -224,8 +231,10 @@ def generate_report(label_counts: dict) -> str:
         _c("Spacing Breakdown",
            f"  [4] Spacing Breakdown    : {n_sb:4d}  {_pct(n_sb, total)}  {_bar(n_sb, total)}",
            use_color),
+        f"  [0] Unclassified/Trans.  : {n_uc:4d}  {_pct(n_uc, total)}  {_bar(n_uc, total)}",
         "",
-        f"  Total clips analysed          : {total}",
+        f"  Total windows analysed        : {total}"
+        + (f"  (tactical: {tactical_total})" if n_uc else ""),
         f"  Coordination efficiency score : {efficiency}%",
     ]
 
@@ -503,14 +512,19 @@ def label_clip(eval_df: pd.DataFrame) -> str:
 # Batch-processing loop
 # ---------------------------------------------------------------------------
 
-def process_directory(input_dir: str) -> None:
+def process_directory(input_dir: str, keep_unclassified: bool = True) -> None:
     """
     Batch-process every CSV in *input_dir*.
 
     For each file:
       1. Load the CSV.
       2. Extract the evaluation window (frames 30–41) and determine the label.
-      3. If label is "Unclassified", delete the file and continue.
+      3. If label is "Unclassified":
+           keep_unclassified=True  (default) → keep the file with
+             target_label="Unclassified" so the temporal model can LEARN the
+             class-0 noise sink (spec §4B) instead of hallucinating tactics
+             on dead-ball windows;
+           keep_unclassified=False → delete the file (legacy behaviour).
       4. Otherwise, keep only the training window (frames 1–29), append
          a `target_label` column, and overwrite the original file.
 
@@ -560,7 +574,7 @@ def process_directory(input_dir: str) -> None:
             # Determine label from evaluation window
             label = label_clip(eval_df)
 
-            if label == "Unclassified":
+            if label == "Unclassified" and not keep_unclassified:
                 os.remove(filepath)
                 print(f"[DELETE] {filename} – Unclassified")
                 deleted += 1
@@ -594,13 +608,16 @@ def process_directory(input_dir: str) -> None:
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        print("Usage: python label_clips.py <directory_of_csvs>")
+    argv = [a for a in sys.argv[1:] if a != "--delete-unclassified"]
+    delete_uc = "--delete-unclassified" in sys.argv[1:]
+    if len(argv) != 1:
+        print("Usage: python label_clips.py <directory_of_csvs> "
+              "[--delete-unclassified]")
         sys.exit(1)
 
-    directory = sys.argv[1]
+    directory = argv[0]
     if not os.path.isdir(directory):
         print(f"Error: '{directory}' is not a valid directory.")
         sys.exit(1)
 
-    process_directory(directory)
+    process_directory(directory, keep_unclassified=not delete_uc)

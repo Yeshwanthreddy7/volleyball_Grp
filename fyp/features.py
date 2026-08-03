@@ -1,5 +1,5 @@
 """
-features.py – Identity-stable, permutation-invariant feature engineering.
+features.py – Identity-stable, permutation-invariant feature engineering (v2).
 
 This module exists to fix three correctness loopholes that silently corrupted
 the original pipeline:
@@ -18,7 +18,7 @@ the original pipeline:
        Untracked players were encoded as the coordinate (0, 0).  (0, 0) is a
        *valid* court location (a corner), so the model cannot distinguish
        "player at the corner" from "player not seen".  Worse, the transition
-       real->（0,0)->real injects a huge fake velocity spike.  We use NaN for
+       real->(0,0)->real injects a huge fake velocity spike.  We use NaN for
        "missing" and provide an explicit presence mask.
 
   (L3) PERMUTATION SENSITIVITY
@@ -254,6 +254,135 @@ def sync_score(tracked: np.ndarray) -> float:
 
 
 # ---------------------------------------------------------------------------
+# Occlusion gap interpolation (spec §2C)
+# ---------------------------------------------------------------------------
+
+def interpolate_gaps(
+    tracked: np.ndarray,
+    max_gap: int = 15,
+    kind: str = "linear",
+) -> np.ndarray:
+    """
+    Bridge short tracking gaps caused by occlusion.
+
+    For every track column, interior runs of NaN that are (a) bounded by valid
+    detections on BOTH sides and (b) no longer than ``max_gap`` frames are
+    filled by 1-D interpolation:
+
+        x(t) = x1 + (x2 - x1) * (t - t1) / (t2 - t1)          (linear)
+
+    or by a cubic spline through the valid samples when ``kind="cubic"`` and
+    SciPy is available with >= 4 support points.  Gaps longer than ``max_gap``
+    and leading/trailing NaN runs are left untouched: extrapolating a player
+    who genuinely left the frame would fabricate data.
+
+    MUST be applied AFTER `recover_identity` – interpolating the raw slot soup
+    would bridge between two different physical players.
+
+    Parameters
+    ----------
+    tracked : (T, K, 2) identity-consistent coordinates, NaN = missing.
+    max_gap : longest occlusion run (frames) that will be bridged.
+    kind    : "linear" (default) or "cubic".
+
+    Returns
+    -------
+    (T, K, 2) copy with short gaps filled.
+    """
+    tr = np.array(tracked, dtype=float)
+    T, K, _ = tr.shape
+    if T < 3:
+        return tr
+
+    use_cubic = kind == "cubic"
+    if use_cubic:
+        try:
+            from scipy.interpolate import CubicSpline  # type: ignore
+        except Exception:
+            use_cubic = False
+
+    for k in range(K):
+        valid = ~np.isnan(tr[:, k]).any(axis=1)
+        v_idx = np.where(valid)[0]
+        if len(v_idx) < 2:
+            continue
+
+        # Identify interior gaps bounded on both sides.
+        fill_ts: list[int] = []
+        for a, b in zip(v_idx[:-1], v_idx[1:]):
+            gap = b - a - 1
+            if 0 < gap <= max_gap:
+                fill_ts.extend(range(a + 1, b))
+        if not fill_ts:
+            continue
+
+        ts = np.array(fill_ts)
+        for ax in range(2):
+            series = tr[:, k, ax]
+            if use_cubic and len(v_idx) >= 4:
+                cs = CubicSpline(v_idx, series[v_idx])
+                tr[ts, k, ax] = cs(ts)
+            else:
+                tr[ts, k, ax] = np.interp(ts, v_idx, series[v_idx])
+
+    return tr
+
+
+# ---------------------------------------------------------------------------
+# Kinematic per-frame features (spec §1B: speed differentials + sync)
+# ---------------------------------------------------------------------------
+
+KINEMATIC_COLS = [
+    "speed_top2",   # mean speed of the 2 fastest players this frame (cm/frame)
+    "speed_bot4",   # mean speed of the remaining (<=4) players    (cm/frame)
+    "speed_diff",   # top2 - bot4: separates frontline attackers from base
+    "sync_inst",    # instantaneous synchronisation (mean pairwise cos-sim)
+]
+
+
+def kinematic_features(tracked: np.ndarray) -> np.ndarray:
+    """
+    Per-frame kinematic descriptors from an IDENTITY-CONSISTENT (T, K, 2) array.
+
+    Frame t uses the displacement t-1 -> t; frame 0 is zeros.  All values are
+    permutation-invariant (speeds are sorted; sync is a mean over pairs).
+
+    Returns
+    -------
+    (T, len(KINEMATIC_COLS)) float32 array, NaN-free.
+    """
+    tr = np.asarray(tracked, dtype=float)
+    T = len(tr)
+    out = np.zeros((T, len(KINEMATIC_COLS)), dtype=np.float32)
+    if T < 2:
+        return out
+
+    vel = np.diff(tr, axis=0)                      # (T-1, K, 2)
+    for t in range(1, T):
+        v = vel[t - 1]
+        speed = np.linalg.norm(v, axis=1)          # (K,)
+        finite = np.isfinite(speed)
+        s = np.sort(speed[finite])[::-1]
+        if len(s) > 0:
+            top2 = float(s[: min(2, len(s))].mean())
+            rest = s[2:6]
+            bot4 = float(rest.mean()) if len(rest) else 0.0
+            out[t, 0] = top2
+            out[t, 1] = bot4
+            out[t, 2] = top2 - bot4
+
+        moving = finite & (speed >= 1e-6)
+        if moving.sum() >= 2:
+            u = v[moving] / speed[moving][:, None]
+            sim = u @ u.T
+            k = int(moving.sum())
+            ri, ci = np.triu_indices(k, k=1)
+            out[t, 3] = float(sim[ri, ci].mean())
+
+    return out
+
+
+# ---------------------------------------------------------------------------
 # L3 fix – permutation-invariant per-frame descriptor
 # ---------------------------------------------------------------------------
 
@@ -385,13 +514,24 @@ def raw_frame_to_arrays(seq_raw: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     return players, ball
 
 
+# The model-input contract.  Bump FEATURE_VERSION whenever the semantics of
+# the produced tensor change: checkpoint loaders compare this tag and refuse
+# to serve silently-mismatched features.
+MODEL_FEATURE_COLS = PERM_INVARIANT_COLS + KINEMATIC_COLS
+MODEL_INPUT_DIM = len(MODEL_FEATURE_COLS)   # 18
+FEATURE_VERSION = "perm_invariant_v2"
+INTERP_MAX_GAP = 15                          # spec §2C occlusion bridge limit
+
+
 def build_model_sequence(seq_raw: np.ndarray, target_len: int = 29) -> np.ndarray:
     """
     Convert a raw (T, 14) slot-ordered clip into the corrected, identity-aware,
-    permutation-invariant model input of shape (target_len, 14).
+    permutation-invariant model input of shape (target_len, MODEL_INPUT_DIM).
 
-    Pipeline:  raw soup  ->  recover_identity (fixes L1: identity swap)
-                          ->  sequence_to_perm_invariant (fixes L2 missing & L3 order)
+    Pipeline:  raw soup  ->  recover_identity        (fixes L1: identity swap)
+                          ->  interpolate_gaps       (bridges <=15-frame occlusion)
+                          ->  perm-invariant descriptor (fixes L2 missing & L3 order)
+                          ->  + kinematic features   (speed top2/bot4/diff, sync)
                           ->  pad / truncate to target_len.
 
     This is the ONE function used by training, inference and the live video
@@ -399,7 +539,12 @@ def build_model_sequence(seq_raw: np.ndarray, target_len: int = 29) -> np.ndarra
     """
     players, ball = raw_frame_to_arrays(seq_raw)
     tracked = recover_identity(players)
-    feats = sequence_to_perm_invariant(tracked, ball)  # (T, 14)
+    tracked = interpolate_gaps(tracked, max_gap=INTERP_MAX_GAP)
+    ball = interpolate_gaps(ball[:, None, :], max_gap=INTERP_MAX_GAP)[:, 0, :]
+
+    feats = sequence_to_perm_invariant(tracked, ball)   # (T, 14)
+    kin = kinematic_features(tracked)                   # (T, 4)
+    feats = np.concatenate([feats, kin], axis=1)        # (T, 18)
 
     if len(feats) < target_len:
         pad = np.zeros((target_len - len(feats), feats.shape[1]), dtype=np.float32)
@@ -410,9 +555,12 @@ def build_model_sequence(seq_raw: np.ndarray, target_len: int = 29) -> np.ndarra
 
 
 __all__ = [
-    "N_PLAYERS", "MISSING", "PERM_INVARIANT_COLS", "RAW_COLS",
+    "N_PLAYERS", "MISSING", "PERM_INVARIANT_COLS", "KINEMATIC_COLS",
+    "MODEL_FEATURE_COLS", "MODEL_INPUT_DIM", "FEATURE_VERSION",
+    "INTERP_MAX_GAP", "RAW_COLS",
     "foot_point", "convex_hull_area",
-    "recover_identity", "player_velocities", "sync_score",
+    "recover_identity", "interpolate_gaps", "kinematic_features",
+    "player_velocities", "sync_score",
     "team_features", "sequence_to_perm_invariant",
     "raw_frame_to_arrays", "build_model_sequence",
 ]

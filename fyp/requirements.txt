@@ -3,19 +3,30 @@ opencv-python>=4.8.0
 numpy>=1.24.0
 pandas>=2.0.0
 
-# Optimal identity assignment (features.recover_identity – Hungarian matcher).
-# A greedy fallback runs automatically if SciPy is absent, but SciPy is
-# recommended for best identity recovery.
+# Optimal identity assignment (features.recover_identity – Hungarian matcher)
+# and cubic-spline gap interpolation (features.interpolate_gaps kind="cubic").
+# Greedy / linear fallbacks run automatically if SciPy is absent.
 scipy>=1.10.0
 
-# Deep learning – Mamba model
+# Deep learning – Mamba SSM / Transformer temporal classifiers
 torch>=2.1.0
 
-# Player detection (YOLOv8) – used by pipeline.py
-ultralytics>=8.0.0
+# Detection + pose (YOLOv8/v9/v11 + *-pose keypoint models) and the
+# BoT-SORT tracker backend (appearance Re-ID + GMC camera-motion comp.)
+ultralytics>=8.1.0
 
-# Player tracking (ByteTrack) – used by pipeline.py
+# ByteTrack tracker backend (IoU-only, default)
 supervision>=0.18.0
+
+# Learned tactical classifier (fyp/ml_classifier.py): the model zoo, the
+# leave-one-video-out protocol, and the probability calibration that keeps the
+# entropy / anomaly channel meaningful. joblib ships the saved model that
+# pipeline.py loads via interfaces.SklearnTemporalClassifier.
+scikit-learn>=1.3.0
+joblib>=1.3.0
+
+# Unit tests
+pytest>=7.0.0
 
 # Optional: GPU acceleration (install the CUDA build of PyTorch instead)
 # See: https://pytorch.org/get-started/locally/

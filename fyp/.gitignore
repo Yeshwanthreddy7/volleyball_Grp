@@ -9,6 +9,11 @@ build/
 .env
 .venv
 
-# Model weight files (downloaded automatically at runtime)
+# Stock detector weights (downloaded automatically at runtime by ultralytics)
 *.pt
 *.pth
+
+# EXCEPT the custom volleyball fine-tune: this one is NOT auto-downloadable,
+# it is a real trained artefact this project produced and depends on at
+# inference time (ball detection - see Technical_Review_and_QA.md sec 13).
+!volleyball_best.pt

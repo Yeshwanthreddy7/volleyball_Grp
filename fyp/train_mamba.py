@@ -39,8 +39,9 @@ from mamba_model import (
     LABEL_NAMES,
     NUM_CLASSES,
     MambaClassifier,
+    create_temporal_model,
 )
-from features import build_model_sequence
+from features import FEATURE_VERSION, build_model_sequence
 
 # Court width used for the horizontal-mirror augmentation (matches the
 # pipeline's 1800 cm convention; mirroring left<->right is label-preserving for
@@ -124,6 +125,7 @@ class VolleyballDataset(Dataset):
         # via features.build_model_sequence(), so train/inference parity is
         # guaranteed and augmentation can be applied at the raw-coordinate level.
         self.samples: list[tuple[np.ndarray, int]] = []
+        self.files: list[str] = []
         self.label_to_idx = {name: i for i, name in enumerate(LABEL_NAMES)}
 
         csv_files = [f for f in os.listdir(directory) if f.lower().endswith(".csv")]
@@ -159,6 +161,7 @@ class VolleyballDataset(Dataset):
 
             raw = df[FEATURE_COLS].values.astype(np.float32)  # (T, 14) raw soup
             self.samples.append((raw, self.label_to_idx[label_str]))
+            self.files.append(fname)
 
         print(
             f"Loaded {len(self.samples)} samples from '{directory}' "
@@ -229,9 +232,15 @@ def compute_class_weights(
     for i in train_indices:
         _, label_idx = dataset.samples[i]
         counts[label_idx] += 1
-    # Inverse frequency; +1 avoids division-by-zero for unseen classes
-    weights = num_classes / (counts + 1.0)
-    weights = weights / weights.mean()
+    # Delegates to the torch-free, unit-tested helper. Crucial property:
+    # a class with ZERO training samples gets weight EXACTLY 0. The previous
+    # "+1" formula gave the empty Unclassified class a ~100x relative weight;
+    # with label smoothing (eps/K target mass on every class, also weighted)
+    # the loss then rewarded the empty class over the true one and the model
+    # collapsed to it (train_acc = 0.000 on the first full run).
+    from train_utils import class_weights_from_counts
+    weights = torch.as_tensor(
+        class_weights_from_counts(counts.numpy()), dtype=torch.float32)
     return weights.to(device)
 
 
@@ -240,12 +249,18 @@ def stratified_split_indices(
     val_split: float,
     test_split: float,
     seed: int,
+    universe: list[int] | None = None,
 ) -> tuple[list[int], list[int], list[int]]:
-    """Build stratified train/val/test index splits based on class labels."""
+    """Build stratified train/val/test index splits based on class labels.
+
+    `universe` restricts the split to a subset of sample indices (used by the
+    leave-one-video-out protocol, where the held-out video is removed first).
+    """
     rng = random.Random(seed)
 
     by_label: dict[int, list[int]] = defaultdict(list)
-    for i, (_, label_idx) in enumerate(dataset.samples):
+    for i in (universe if universe is not None else range(len(dataset.samples))):
+        _, label_idx = dataset.samples[i]
         by_label[int(label_idx)].append(i)
 
     train_indices: list[int] = []
@@ -427,12 +442,34 @@ def train(args: argparse.Namespace) -> None:
         return
 
     n_total = len(full_dataset)
-    train_indices, val_indices, test_indices = stratified_split_indices(
-        full_dataset,
-        val_split=args.val_split,
-        test_split=args.test_split,
-        seed=args.seed,
-    )
+    if args.test_video:
+        # Leave-one-video-out: the WHOLE held-out video is the test set -
+        # metrics then measure cross-video (truly unseen) generalisation.
+        from train_utils import holdout_indices, video_key
+        test_indices, rest = holdout_indices(full_dataset.files, args.test_video)
+        test_classes = {int(full_dataset.samples[i][1]) for i in test_indices}
+        keys_present = sorted({video_key(f) for f in full_dataset.files})
+        print(f"UNSEEN-VIDEO TEST: holdout '{args.test_video}' -> "
+              f"{len(test_indices)} clips ({len(test_classes)} classes); "
+              f"video keys in dataset: {keys_present}")
+        if len(test_indices) == 0 or len(test_classes) < 2:
+            print("[ERROR] holdout video has too few clips/classes - "
+                  "pass one of the keys listed above via --test-video.")
+            return
+        train_indices, val_indices, _ = stratified_split_indices(
+            full_dataset,
+            val_split=args.val_split,
+            test_split=0.0,
+            seed=args.seed,
+            universe=rest,
+        )
+    else:
+        train_indices, val_indices, test_indices = stratified_split_indices(
+            full_dataset,
+            val_split=args.val_split,
+            test_split=args.test_split,
+            seed=args.seed,
+        )
 
     n_train = len(train_indices)
     n_val = len(val_indices)
@@ -477,8 +514,9 @@ def train(args: argparse.Namespace) -> None:
         te = test_dist.get(label, 0)
         print(f"  {label:22s} train={t:4d}  val={v:4d}  test={te:4d}")
 
-    # ── Model ─────────────────────────────────────────────────────────────
-    model = MambaClassifier(
+    # ── Model (abstract temporal-model factory, spec §5B) ──────────────────
+    model = create_temporal_model(
+        args.arch,
         input_dim=INPUT_DIM,
         d_model=args.d_model,
         n_layers=args.n_layers,
@@ -487,6 +525,7 @@ def train(args: argparse.Namespace) -> None:
         num_classes=NUM_CLASSES,
         dropout=args.dropout,
     ).to(device)
+    print(f"Temporal architecture: {args.arch}")
 
     n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print(f"Parameters: {n_params:,}")
@@ -547,19 +586,21 @@ def train(args: argparse.Namespace) -> None:
             best_val_macro_f1 = monitor
             best_epoch = epoch
             patience_counter = 0
+            ckpt_args = dict(vars(args))
+            ckpt_args["input_dim"] = INPUT_DIM   # explicit for loaders
             torch.save(
                 {
                     "epoch": epoch,
                     "model_state": model.state_dict(),
                     "norm_mean": mean,
                     "norm_std": std,
-                    "args": vars(args),
+                    "args": ckpt_args,
                     "label_names": LABEL_NAMES,
                     "best_val_macro_f1": best_val_macro_f1,
-                    # Tags the input representation. Loaders refuse / warn if an
-                    # old checkpoint (raw-coordinate features) is used with the
-                    # new permutation-invariant pipeline.
-                    "feature_version": "perm_invariant_v1",
+                    # Tags the input representation. Loaders refuse / warn if a
+                    # checkpoint trained on different feature semantics is used
+                    # with the current pipeline.
+                    "feature_version": FEATURE_VERSION,
                 },
                 args.checkpoint,
             )
@@ -593,6 +634,12 @@ def train(args: argparse.Namespace) -> None:
         cm = test_metrics["confusion"]
         print("  confusion matrix (rows=true, cols=pred):")
         print(cm)
+
+        print(f"LOVO_RESULT video={args.test_video or 'random-split'} "
+              f"n_test={len(test_indices)} "
+              f"acc={test_metrics['accuracy']:.3f} "
+              f"macro_f1={test_metrics['macro_f1']:.3f} "
+              f"balanced_acc={test_metrics['balanced_acc']:.3f}")
 
         test_summary = (
             f" Test acc={test_metrics['accuracy']:.3f}, "
@@ -628,12 +675,26 @@ def _parse_args() -> argparse.Namespace:
         help="Fraction of data held out for validation.",
     )
     parser.add_argument(
+        "--test-video",
+        default="",
+        help="Leave-one-video-out: hold ALL clips of this source video out as "
+             "the test set (e.g. '(1)', '(3)', '(plain)'). Overrides "
+             "--test_split. Measures cross-video generalisation.",
+    )
+    parser.add_argument(
         "--test_split",
         type=float,
         default=0.1,
         help="Fraction of data held out for final unseen-data testing.",
     )
     # Model
+    parser.add_argument(
+        "--arch",
+        choices=("mamba", "transformer"),
+        default="mamba",
+        help="Temporal architecture. The abstract classifier interface makes "
+             "the swap a pure retraining exercise (spec §5B).",
+    )
     parser.add_argument("--d_model", type=int, default=64,  help="Model dimension.")
     parser.add_argument("--n_layers", type=int, default=4,  help="Number of Mamba blocks.")
     parser.add_argument("--d_state", type=int, default=16,  help="SSM state dimension.")

@@ -1,0 +1,429 @@
+{
+  "n_clips": 285,
+  "n_features": 132,
+  "class_counts": {
+    "Coordinated Attack": 90,
+    "Coordinated Defense": 134,
+    "Delayed Support": 16,
+    "Spacing Breakdown": 45
+  },
+  "majority_baseline": {
+    "accuracy": 0.47017543859649125,
+    "balanced_accuracy": 0.25,
+    "macro_f1": 0.15990453460620524,
+    "weighted_f1": 0.3007327387681614,
+    "cohen_kappa": 0.0
+  },
+  "winner": "hist_gradient_boosting",
+  "selected_by": "lovo_macro_f1",
+  "models": {
+    "logistic_regression": {
+      "model": "logistic_regression",
+      "kfold_accuracy": 0.5087719298245614,
+      "kfold_balanced_accuracy": 0.3843283582089552,
+      "kfold_macro_f1": 0.3791385253054101,
+      "kfold_weighted_f1": 0.5119170845963075,
+      "kfold_cohen_kappa": 0.26143936028431813,
+      "lovo_accuracy": 0.4070175438596491,
+      "lovo_balanced_accuracy": 0.29517516583747927,
+      "lovo_macro_f1": 0.2884016798418972,
+      "lovo_weighted_f1": 0.4105141807086887,
+      "lovo_cohen_kappa": 0.09941662615459412
+    },
+    "linear_svm": {
+      "model": "linear_svm",
+      "kfold_accuracy": 0.5228070175438596,
+      "kfold_balanced_accuracy": 0.39274461028192376,
+      "kfold_macro_f1": 0.391456351303735,
+      "kfold_weighted_f1": 0.5232275323615593,
+      "kfold_cohen_kappa": 0.271948608137045,
+      "lovo_accuracy": 0.42105263157894735,
+      "lovo_balanced_accuracy": 0.2833281509121061,
+      "lovo_macro_f1": 0.2820831035972938,
+      "lovo_weighted_f1": 0.42038109646900607,
+      "lovo_cohen_kappa": 0.11228361618182858
+    },
+    "rbf_svm": {
+      "model": "rbf_svm",
+      "kfold_accuracy": 0.6210526315789474,
+      "kfold_balanced_accuracy": 0.440257048092869,
+      "kfold_macro_f1": 0.4381246433520828,
+      "kfold_weighted_f1": 0.5974254418143671,
+      "kfold_cohen_kappa": 0.38712118195213263,
+      "lovo_accuracy": 0.4421052631578947,
+      "lovo_balanced_accuracy": 0.25605306799336647,
+      "lovo_macro_f1": 0.22780423548485157,
+      "lovo_weighted_f1": 0.3773400671605044,
+      "lovo_cohen_kappa": 0.0260284572067232
+    },
+    "knn": {
+      "model": "knn",
+      "kfold_accuracy": 0.5789473684210527,
+      "kfold_balanced_accuracy": 0.40422885572139305,
+      "kfold_macro_f1": 0.4018857138850899,
+      "kfold_weighted_f1": 0.5509368456001836,
+      "kfold_cohen_kappa": 0.3046660567246111,
+      "lovo_accuracy": 0.47719298245614034,
+      "lovo_balanced_accuracy": 0.2865671641791045,
+      "lovo_macro_f1": 0.2630176340509176,
+      "lovo_weighted_f1": 0.4238565189552535,
+      "lovo_cohen_kappa": 0.10256139312735102
+    },
+    "mlp": {
+      "model": "mlp",
+      "kfold_accuracy": 0.6,
+      "kfold_balanced_accuracy": 0.44108623548922055,
+      "kfold_macro_f1": 0.4376308679500169,
+      "kfold_weighted_f1": 0.584075081320322,
+      "kfold_cohen_kappa": 0.3646976007508653,
+      "lovo_accuracy": 0.4807017543859649,
+      "lovo_balanced_accuracy": 0.28934494195688226,
+      "lovo_macro_f1": 0.26710272964095594,
+      "lovo_weighted_f1": 0.43181858826474956,
+      "lovo_cohen_kappa": 0.12146963259185206
+    },
+    "random_forest": {
+      "model": "random_forest",
+      "kfold_accuracy": 0.6140350877192983,
+      "kfold_balanced_accuracy": 0.48548922056384747,
+      "kfold_macro_f1": 0.46131217508660294,
+      "kfold_weighted_f1": 0.6008514755734191,
+      "kfold_cohen_kappa": 0.40386772899275514,
+      "lovo_accuracy": 0.5157894736842106,
+      "lovo_balanced_accuracy": 0.3126036484245439,
+      "lovo_macro_f1": 0.29027765426003327,
+      "lovo_weighted_f1": 0.4611175153828685,
+      "lovo_cohen_kappa": 0.17193026781202625
+    },
+    "extra_trees": {
+      "model": "extra_trees",
+      "kfold_accuracy": 0.631578947368421,
+      "kfold_balanced_accuracy": 0.47276119402985073,
+      "kfold_macro_f1": 0.4666162071557351,
+      "kfold_weighted_f1": 0.6096148069526626,
+      "kfold_cohen_kappa": 0.402420272779919,
+      "lovo_accuracy": 0.5508771929824562,
+      "lovo_balanced_accuracy": 0.3284825870646766,
+      "lovo_macro_f1": 0.29318131747080856,
+      "lovo_weighted_f1": 0.47268004777310096,
+      "lovo_cohen_kappa": 0.20361516798742552
+    },
+    "gradient_boosting": {
+      "model": "gradient_boosting",
+      "kfold_accuracy": 0.5859649122807018,
+      "kfold_balanced_accuracy": 0.4060116086235489,
+      "kfold_macro_f1": 0.4061836178398129,
+      "kfold_weighted_f1": 0.5658159317523612,
+      "kfold_cohen_kappa": 0.32985273897535017,
+      "lovo_accuracy": 0.4070175438596491,
+      "lovo_balanced_accuracy": 0.2567993366500829,
+      "lovo_macro_f1": 0.25543546959929214,
+      "lovo_weighted_f1": 0.3999560904536654,
+      "lovo_cohen_kappa": 0.08685018769195774
+    },
+    "hist_gradient_boosting": {
+      "model": "hist_gradient_boosting",
+      "kfold_accuracy": 0.6210526315789474,
+      "kfold_balanced_accuracy": 0.44303482587064674,
+      "kfold_macro_f1": 0.44002705908518047,
+      "kfold_weighted_f1": 0.5991759367281723,
+      "kfold_cohen_kappa": 0.39036225712531447,
+      "lovo_accuracy": 0.4842105263157895,
+      "lovo_balanced_accuracy": 0.30592350746268654,
+      "lovo_macro_f1": 0.2993066914736007,
+      "lovo_weighted_f1": 0.4556765383138863,
+      "lovo_cohen_kappa": 0.16082445316881655
+    }
+  },
+  "channel_importance": {
+    "baseline_macro_f1": 0.26568335731788545,
+    "protocol": "leave-one-video-out, permuted on the held-out video",
+    "channels": [
+      {
+        "channel": "centroid_y",
+        "n_columns": 4,
+        "importance_mean": 0.02922722265480924,
+        "importance_std": 0.020314159750043036
+      },
+      {
+        "channel": "hull_area",
+        "n_columns": 4,
+        "importance_mean": 0.02232116447352536,
+        "importance_std": 0.025712631601159795
+      },
+      {
+        "channel": "loosest_pair",
+        "n_columns": 6,
+        "importance_mean": 0.01597951472983469,
+        "importance_std": 0.012862313996132104
+      },
+      {
+        "channel": "speed_bot4",
+        "n_columns": 4,
+        "importance_mean": 0.01542370185302374,
+        "importance_std": 0.020853012922174657
+      },
+      {
+        "channel": "tightest_pair",
+        "n_columns": 6,
+        "importance_mean": 0.013977919147373044,
+        "importance_std": 0.02112382984937549
+      },
+      {
+        "channel": "sync_inst",
+        "n_columns": 10,
+        "importance_mean": 0.01061910840427812,
+        "importance_std": 0.008904376392290749
+      },
+      {
+        "channel": "n_present",
+        "n_columns": 10,
+        "importance_mean": 0.006831051351955623,
+        "importance_std": 0.017196194947154915
+      },
+      {
+        "channel": "speed_top2",
+        "n_columns": 4,
+        "importance_mean": 0.006619026910855752,
+        "importance_std": 0.0188117571502193
+      },
+      {
+        "channel": "ball_offset",
+        "n_columns": 6,
+        "importance_mean": 0.006211876187580081,
+        "importance_std": 0.007621860627828657
+      },
+      {
+        "channel": "nn_dist_mean",
+        "n_columns": 4,
+        "importance_mean": 0.005195253703037208,
+        "importance_std": 0.013867883839079647
+      },
+      {
+        "channel": "speed_diff_share",
+        "n_columns": 6,
+        "importance_mean": 0.0051481405307116776,
+        "importance_std": 0.02418876352989583
+      },
+      {
+        "channel": "compactness",
+        "n_columns": 6,
+        "importance_mean": 0.004622099960747939,
+        "importance_std": 0.01219810970535706
+      },
+      {
+        "channel": "ball_x",
+        "n_columns": 4,
+        "importance_mean": 0.003212461831282905,
+        "importance_std": 0.00722260975143722
+      },
+      {
+        "channel": "ball_y",
+        "n_columns": 4,
+        "importance_mean": 0.002897176736682361,
+        "importance_std": 0.0033994299178519358
+      },
+      {
+        "channel": "max_pair_dist",
+        "n_columns": 4,
+        "importance_mean": 0.0016054318470493064,
+        "importance_std": 0.0057562129638507875
+      },
+      {
+        "channel": "speed_diff",
+        "n_columns": 4,
+        "importance_mean": 0.0013794315635751175,
+        "importance_std": 0.0032786910825009594
+      },
+      {
+        "channel": "spread_x",
+        "n_columns": 4,
+        "importance_mean": 0.0011229906034206335,
+        "importance_std": 0.010236995366115404
+      },
+      {
+        "channel": "nn_dist_min",
+        "n_columns": 4,
+        "importance_mean": 0.0008344561038790036,
+        "importance_std": 0.008672297928185125
+      },
+      {
+        "channel": "ball_to_centroid",
+        "n_columns": 4,
+        "importance_mean": 0.0005697017763465355,
+        "importance_std": 0.019438747276015102
+      },
+      {
+        "channel": "centroid_x",
+        "n_columns": 4,
+        "importance_mean": -0.0011745083038914787,
+        "importance_std": 0.01561973662203675
+      }
+    ]
+  },
+  "feature_mode": "invariant",
+  "gold": {
+    "n_gold": 120,
+    "rules_vs_human": {
+      "accuracy": 0.7666666666666667,
+      "balanced_accuracy": 0.68136598621421,
+      "macro_f1": 0.6947997267663027,
+      "weighted_f1": 0.747873409571816,
+      "cohen_kappa": 0.6648379052369077
+    },
+    "model_vs_human": {
+      "accuracy": 0.725,
+      "balanced_accuracy": 0.60324098621421,
+      "macro_f1": 0.5680272108843537,
+      "weighted_f1": 0.6696712018140588,
+      "cohen_kappa": 0.5991902834008098
+    },
+    "model_vs_rules": {
+      "accuracy": 0.95,
+      "balanced_accuracy": 0.75,
+      "macro_f1": 0.7357975622681505,
+      "weighted_f1": 0.9259874580462816,
+      "cohen_kappa": 0.9213887979037013
+    },
+    "clips": [
+      "Coordinated_Attack__videoplayback (3)_clip_061.csv",
+      "Delayed_Support__videoplayback (4)_clip_139.csv",
+      "Coordinated_Defense__videoplayback (3)_clip_096.csv",
+      "Coordinated_Defense__videoplayback (3)_clip_075.csv",
+      "Spacing_Breakdown__videoplayback (1)_clip_028.csv",
+      "Coordinated_Defense__videoplayback (3)_clip_010.csv",
+      "Spacing_Breakdown__videoplayback (1)_clip_100.csv",
+      "Delayed_Support__videoplayback (4)_clip_114.csv",
+      "Coordinated_Attack__videoplayback (1)_clip_112.csv",
+      "Coordinated_Defense__videoplayback (1)_clip_077.csv",
+      "Spacing_Breakdown__videoplayback (1)_clip_071.csv",
+      "Spacing_Breakdown__videoplayback (1)_clip_101.csv",
+      "Coordinated_Defense__videoplayback (1)_clip_021.csv",
+      "Delayed_Support__videoplayback (1)_clip_007.csv",
+      "Spacing_Breakdown__videoplayback (1)_clip_099.csv",
+      "Coordinated_Attack__videoplayback (3)_clip_008.csv",
+      "Coordinated_Attack__videoplayback (3)_clip_047.csv",
+      "Coordinated_Attack__videoplayback (3)_clip_087.csv",
+      "Coordinated_Defense__videoplayback (1)_clip_008.csv",
+      "Coordinated_Defense__videoplayback (1)_clip_034.csv",
+      "Coordinated_Defense__videoplayback (1)_clip_003.csv",
+      "Coordinated_Attack__videoplayback (3)_clip_105.csv",
+      "Coordinated_Defense__videoplayback (4)_clip_125.csv",
+      "Spacing_Breakdown__videoplayback (1)_clip_105.csv",
+      "Coordinated_Attack__videoplayback (3)_clip_021.csv",
+      "Coordinated_Defense__videoplayback (1)_clip_017.csv",
+      "Coordinated_Attack__videoplayback (1)_clip_039.csv",
+      "Coordinated_Defense__videoplayback (1)_clip_067.csv",
+      "Coordinated_Defense__videoplayback (4)_clip_143.csv",
+      "Coordinated_Defense__videoplayback (3)_clip_081.csv",
+      "Coordinated_Defense__videoplayback (1)_clip_015.csv",
+      "Coordinated_Attack__videoplayback (3)_clip_003.csv",
+      "Coordinated_Defense__videoplayback (1)_clip_050.csv",
+      "Coordinated_Attack__videoplayback (1)_clip_041.csv",
+      "Spacing_Breakdown__videoplayback (1)_clip_114.csv",
+      "Coordinated_Attack__videoplayback (1)_clip_035.csv",
+      "Coordinated_Defense__videoplayback (4)_clip_137.csv",
+      "Coordinated_Defense__videoplayback (1)_clip_080.csv",
+      "Delayed_Support__videoplayback (3)_clip_074.csv",
+      "Coordinated_Defense__videoplayback (1)_clip_082.csv",
+      "Coordinated_Attack__videoplayback (4)_clip_152.csv",
+      "Spacing_Breakdown__videoplayback (1)_clip_120.csv",
+      "Coordinated_Defense__videoplayback (3)_clip_052.csv",
+      "Coordinated_Defense__videoplayback (3)_clip_004.csv",
+      "Spacing_Breakdown__videoplayback (1)_clip_092.csv",
+      "Coordinated_Attack__videoplayback (3)_clip_002.csv",
+      "Coordinated_Defense__videoplayback (3)_clip_106.csv",
+      "Spacing_Breakdown__videoplayback (4)_clip_113.csv",
+      "Coordinated_Attack__videoplayback (4)_clip_144.csv",
+      "Coordinated_Defense__videoplayback (3)_clip_013.csv",
+      "Coordinated_Defense__videoplayback (1)_clip_070.csv",
+      "Coordinated_Defense__videoplayback (3)_clip_090.csv",
+      "Spacing_Breakdown__videoplayback (4)_clip_119.csv",
+      "Spacing_Breakdown__videoplayback (1)_clip_094.csv",
+      "Spacing_Breakdown__videoplayback (1)_clip_108.csv",
+      "Coordinated_Defense__videoplayback (1)_clip_058.csv",
+      "Spacing_Breakdown__videoplayback (1)_clip_042.csv",
+      "Coordinated_Attack__videoplayback (1)_clip_111.csv",
+      "Coordinated_Defense__videoplayback (3)_clip_101.csv",
+      "Coordinated_Defense__videoplayback (3)_clip_034.csv",
+      "Spacing_Breakdown__videoplayback (1)_clip_106.csv",
+      "Coordinated_Defense__videoplayback (3)_clip_026.csv",
+      "Delayed_Support__videoplayback (1)_clip_076.csv",
+      "Coordinated_Attack__videoplayback (3)_clip_064.csv",
+      "Spacing_Breakdown__videoplayback (4)_clip_156.csv",
+      "Coordinated_Attack__videoplayback (1)_clip_054.csv",
+      "Coordinated_Attack__videoplayback (4)_clip_138.csv",
+      "Coordinated_Attack__videoplayback (3)_clip_032.csv",
+      "Coordinated_Attack__videoplayback (4)_clip_159.csv",
+      "Coordinated_Attack__videoplayback (1)_clip_125.csv",
+      "Coordinated_Attack__videoplayback (3)_clip_094.csv",
+      "Coordinated_Defense__videoplayback (4)_clip_110.csv",
+      "Coordinated_Attack__videoplayback (4)_clip_158.csv",
+      "Coordinated_Attack__videoplayback (1)_clip_009.csv",
+      "Coordinated_Defense__videoplayback (3)_clip_076.csv",
+      "Coordinated_Defense__videoplayback (4)_clip_140.csv",
+      "Coordinated_Defense__videoplayback (1)_clip_124.csv",
+      "Coordinated_Defense__videoplayback (1)_clip_083.csv",
+      "Coordinated_Attack__videoplayback (1)_clip_104.csv",
+      "Coordinated_Attack__videoplayback (3)_clip_102.csv",
+      "Coordinated_Defense__videoplayback (4)_clip_151.csv",
+      "Coordinated_Defense__videoplayback (1)_clip_046.csv",
+      "Coordinated_Defense__videoplayback (3)_clip_070.csv",
+      "Coordinated_Defense__videoplayback (3)_clip_097.csv",
+      "Coordinated_Defense__videoplayback (1)_clip_081.csv",
+      "Coordinated_Defense__videoplayback (3)_clip_046.csv",
+      "Coordinated_Attack__videoplayback (4)_clip_122.csv",
+      "Spacing_Breakdown__videoplayback (1)_clip_115.csv",
+      "Coordinated_Attack__videoplayback (3)_clip_017.csv",
+      "Coordinated_Defense__videoplayback (3)_clip_056.csv",
+      "Coordinated_Defense__videoplayback (4)_clip_123.csv",
+      "Spacing_Breakdown__videoplayback (1)_clip_096.csv",
+      "Coordinated_Attack__videoplayback (4)_clip_160.csv",
+      "Coordinated_Defense__videoplayback (3)_clip_022.csv",
+      "Coordinated_Attack__videoplayback (4)_clip_133.csv",
+      "Coordinated_Attack__videoplayback (1)_clip_026.csv",
+      "Coordinated_Attack__videoplayback (3)_clip_068.csv",
+      "Coordinated_Attack__videoplayback (3)_clip_091.csv",
+      "Coordinated_Defense__videoplayback (3)_clip_051.csv",
+      "Coordinated_Defense__videoplayback (1)_clip_098.csv",
+      "Coordinated_Defense__videoplayback (3)_clip_059.csv",
+      "Coordinated_Attack__videoplayback (3)_clip_014.csv",
+      "Coordinated_Defense__videoplayback (3)_clip_072.csv",
+      "Coordinated_Attack__videoplayback (4)_clip_147.csv",
+      "Coordinated_Defense__videoplayback (1)_clip_122.csv",
+      "Coordinated_Attack__videoplayback (1)_clip_084.csv",
+      "Coordinated_Defense__videoplayback (3)_clip_085.csv",
+      "Coordinated_Defense__videoplayback (3)_clip_073.csv",
+      "Coordinated_Defense__videoplayback (1)_clip_052.csv",
+      "Coordinated_Attack__videoplayback (1)_clip_038.csv",
+      "Coordinated_Attack__videoplayback (4)_clip_141.csv",
+      "Coordinated_Attack__videoplayback (3)_clip_050.csv",
+      "Coordinated_Defense__videoplayback (3)_clip_031.csv",
+      "Delayed_Support__videoplayback (3)_clip_043.csv",
+      "Coordinated_Attack__videoplayback (4)_clip_157.csv",
+      "Coordinated_Attack__videoplayback (1)_clip_030.csv",
+      "Spacing_Breakdown__videoplayback (1)_clip_019.csv",
+      "Coordinated_Defense__videoplayback (1)_clip_010.csv",
+      "Coordinated_Attack__videoplayback (1)_clip_078.csv",
+      "Coordinated_Defense__videoplayback (3)_clip_092.csv"
+    ]
+  },
+  "calibration": {
+    "calibrated": true,
+    "method": "sigmoid",
+    "cv_folds": 5
+  },
+  "confidence_uncalibrated": {
+    "mean_confidence": 0.9999806618769548,
+    "median_confidence": 0.999982876157471,
+    "frac_confidence_above_0.99": 1.0,
+    "mean_entropy_bits": 0.0003406742422335196
+  },
+  "confidence_calibrated": {
+    "mean_confidence": 0.6672444493591265,
+    "median_confidence": 0.6849201334368507,
+    "frac_confidence_above_0.99": 0.0,
+    "mean_entropy_bits": 1.3563754240012522
+  },
+  "label_provenance": "Labels come from label_clips.py (rule engine). Cross-validation scores measure agreement with that teacher, not tactical accuracy. Only the 'gold' block compares against human judgement."
+}

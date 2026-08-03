@@ -200,16 +200,25 @@ class MambaBlock(nn.Module):
 # Full Mamba Sequence Classifier
 # ---------------------------------------------------------------------------
 
-# Label index → string mapping  (must match label_clips.py)
+# Label index → string mapping  (must match label_clips.py).
+# "Unclassified" is the NOISE-SINK class (spec §4B): dead-ball phases,
+# celebrations, huddles and service preparation are routed here instead of
+# being forced into a tactical class (which would poison the gradients of the
+# four real classes).  It sits at the END of the model-output vector so the
+# four tactical indices are unchanged; its user-facing numeric index is 0.
 LABEL_NAMES = [
     "Spacing Breakdown",
     "Delayed Support",
     "Coordinated Attack",
     "Coordinated Defense",
+    "Unclassified",
 ]
 NUM_CLASSES = len(LABEL_NAMES)
 
-# Feature columns expected in each CSV row (same order as label_clips.py)
+# Raw columns as stored in the clip CSVs (slot-ordered coordinate soup).
+# NOTE: these are the columns READ from disk – the tensor actually fed to the
+# model is the corrected 18-dim permutation-invariant descriptor produced by
+# features.build_model_sequence() (see features.MODEL_FEATURE_COLS).
 FEATURE_COLS = [
     "ball_x", "ball_y",
     "p1_x", "p1_y",
@@ -219,7 +228,12 @@ FEATURE_COLS = [
     "p5_x", "p5_y",
     "p6_x", "p6_y",
 ]
-INPUT_DIM = len(FEATURE_COLS)  # 14
+
+# Model-input width comes from the single-source-of-truth feature module.
+try:
+    from features import MODEL_INPUT_DIM as INPUT_DIM
+except ImportError:  # pragma: no cover – allows importing this file standalone
+    INPUT_DIM = 18
 
 
 class MambaClassifier(nn.Module):
@@ -324,3 +338,68 @@ class MambaClassifier(nn.Module):
         probs = F.softmax(logits, dim=-1)[0]
         label = LABEL_NAMES[probs.argmax().item()]
         return label, probs
+
+
+# ---------------------------------------------------------------------------
+# Transformer baseline – proves the temporal-model layer is swappable
+# ---------------------------------------------------------------------------
+
+class TransformerClassifier(nn.Module):
+    """
+    Standard Transformer-encoder sequence classifier with the SAME I/O contract
+    as MambaClassifier: (batch, seq_len, input_dim) -> (batch, num_classes).
+
+    Exists so the sequential layer can be benchmarked / swapped without
+    touching file I/O or evaluation loops (spec §5B).  Select it with
+    ``train_mamba.py --arch transformer``.
+    """
+
+    def __init__(
+        self,
+        input_dim: int = INPUT_DIM,
+        d_model: int = 64,
+        n_layers: int = 4,
+        n_heads: int = 4,
+        num_classes: int = NUM_CLASSES,
+        dropout: float = 0.1,
+        max_len: int = 64,
+        # accepted-and-ignored so both architectures share one constructor call
+        d_state: int = 16,
+        d_conv: int = 4,
+    ) -> None:
+        super().__init__()
+        self.embed = nn.Linear(input_dim, d_model)
+        self.pos = nn.Parameter(torch.zeros(1, max_len, d_model))
+        nn.init.trunc_normal_(self.pos, std=0.02)
+        layer = nn.TransformerEncoderLayer(
+            d_model=d_model, nhead=n_heads, dim_feedforward=d_model * 4,
+            dropout=dropout, batch_first=True, activation="gelu",
+        )
+        self.encoder = nn.TransformerEncoder(layer, num_layers=n_layers)
+        self.norm = nn.LayerNorm(d_model)
+        self.head = nn.Sequential(
+            nn.Dropout(dropout),
+            nn.Linear(d_model, d_model // 2),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(d_model // 2, num_classes),
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        h = self.embed(x) + self.pos[:, : x.shape[1]]
+        h = self.encoder(h)
+        h = self.norm(h).mean(dim=1)
+        return self.head(h)
+
+
+def create_temporal_model(arch: str = "mamba", **kwargs) -> nn.Module:
+    """Factory: 'mamba' -> MambaClassifier, 'transformer' -> TransformerClassifier."""
+    arch = arch.lower()
+    if arch == "mamba":
+        kwargs.pop("n_heads", None)
+        return MambaClassifier(**kwargs)
+    if arch == "transformer":
+        return TransformerClassifier(**kwargs)
+    raise ValueError(f"Unknown temporal architecture '{arch}' (mamba|transformer)")
+
+# temporal-model factory: mamba | transformer. sync-marker.

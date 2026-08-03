@@ -1,0 +1,2 @@
+sequence,frame_start,frame_end,label,label_index,confidence,entropy_bits,entropy_norm,anomaly,sync_score,mean_spacing_cm,centroid_vel_cm_per_frame,var_spatial_cm2,speed_top2_cm_frame,speed_bot4_cm_frame,speed_diff_cm_frame,gate_mean_speed_cm_frame,gate_players_present
+1,1,29,Unclassified,0,1.0,0.0,0.0,False,-0.05,220.7,0.92,123545.4,3.27,0.21,3.06,1.23,6.0

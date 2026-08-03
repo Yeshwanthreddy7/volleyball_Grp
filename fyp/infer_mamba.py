@@ -29,50 +29,21 @@ import sys
 import numpy as np
 import pandas as pd
 import torch
-import torch.nn.functional as F
 
-from mamba_model import FEATURE_COLS, INPUT_DIM, LABEL_NAMES, MambaClassifier
+from mamba_model import FEATURE_COLS
 from label_clips import LABEL_TO_INDEX, generate_report
 from features import build_model_sequence
+from interfaces import TorchTemporalClassifier
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _load_checkpoint(path: str, device: torch.device) -> tuple[MambaClassifier, torch.Tensor, torch.Tensor]:
-    """Load a checkpoint and return (model, norm_mean, norm_std)."""
-    ckpt = torch.load(path, map_location=device, weights_only=False)
-    if ckpt.get("feature_version") != "perm_invariant_v1":
-        print(
-            "[WARNING] Checkpoint predates the permutation-invariant feature "
-            "pipeline; predictions will be INVALID. Retrain with train_mamba.py.",
-            file=sys.stderr,
-        )
-    saved_args = ckpt.get("args", {})
-
-    model = MambaClassifier(
-        input_dim=saved_args.get("input_dim", INPUT_DIM),
-        d_model=saved_args.get("d_model", 64),
-        n_layers=saved_args.get("n_layers", 4),
-        d_state=saved_args.get("d_state", 16),
-        d_conv=saved_args.get("d_conv", 4),
-        num_classes=len(LABEL_NAMES),
-        dropout=0.0,  # no dropout at inference time
-    )
-    model.load_state_dict(ckpt["model_state"])
-    model.to(device)
-    model.eval()
-
-    mean = ckpt["norm_mean"].to(device)
-    std = ckpt["norm_std"].to(device)
-    return model, mean, std
-
-
-def _prepare_sequence(df: pd.DataFrame) -> torch.Tensor | None:
+def _prepare_sequence(df: pd.DataFrame) -> np.ndarray | None:
     """
     Extract the training window (up to 29 frames) from a dataframe.
-    Returns a (29, 14) float32 tensor, or None if columns are missing.
+    Returns a (29, MODEL_INPUT_DIM) float32 array, or None if columns missing.
     """
     missing = [c for c in FEATURE_COLS if c not in df.columns]
     if missing:
@@ -88,8 +59,7 @@ def _prepare_sequence(df: pd.DataFrame) -> torch.Tensor | None:
 
     # Build the corrected, identity-aware, permutation-invariant model input –
     # identical to what train_mamba.py and pipeline.py feed the network.
-    seq = build_model_sequence(raw, target_len=29)
-    return torch.from_numpy(seq)  # (29, 14)
+    return build_model_sequence(raw, target_len=29)
 
 
 # ---------------------------------------------------------------------------
@@ -106,7 +76,11 @@ def run_inference(args: argparse.Namespace) -> None:
     print(f"Loading checkpoint: {args.checkpoint}")
 
     try:
-        model, mean, std = _load_checkpoint(args.checkpoint, device)
+        classifier = TorchTemporalClassifier(
+            args.checkpoint, device=device,
+            anomaly_threshold=args.anomaly_threshold,
+        )
+        print(f"Temporal backend: {classifier.name}")
     except FileNotFoundError:
         print(f"[ERROR] Checkpoint not found: {args.checkpoint}", file=sys.stderr)
         sys.exit(1)
@@ -131,28 +105,24 @@ def run_inference(args: argparse.Namespace) -> None:
             print(f"[SKIP] {fname}: missing required feature columns.")
             continue
 
-        # Normalise with training statistics
-        seq = (seq.to(device) - mean) / std  # (29, 14)
-
-        with torch.no_grad():
-            logits = model(seq.unsqueeze(0))      # (1, 4)
-            probs = F.softmax(logits, dim=-1)[0]  # (4,)
-
-        pred_idx = probs.argmax().item()
-        pred_label = LABEL_NAMES[pred_idx]
-        confidence = probs[pred_idx].item()
-        numeric_idx = LABEL_TO_INDEX.get(pred_label, 0)
+        res = classifier.classify(seq)
+        pred_label = res.label
+        numeric_idx = res.numeric_idx
 
         results.append({
             "file": fname,
             "prediction": pred_label,
             "label_index": numeric_idx,
-            "confidence": confidence,
-            **{f"p_{n}": probs[i].item() for i, n in enumerate(LABEL_NAMES)},
+            "confidence": round(res.confidence, 4),
+            "entropy_bits": res.entropy,
+            "anomaly": res.is_anomaly,
+            **{f"p_{n}": p for n, p in res.probs.items()},
         })
 
+        flag = "  [ANOMALY]" if res.is_anomaly else ""
         print(
-            f"[OK] {fname:40s}  →  [{numeric_idx}] {pred_label:25s}  (conf: {confidence:.3f})"
+            f"[OK] {fname:40s}  →  [{numeric_idx}] {pred_label:25s}  "
+            f"(conf: {res.confidence:.3f}, H: {res.entropy:.2f}b){flag}"
         )
 
         if args.write:
@@ -208,6 +178,13 @@ def _parse_args() -> argparse.Namespace:
         "--output_csv",
         default="",
         help="Optional path to save a summary CSV of all predictions.",
+    )
+    parser.add_argument(
+        "--anomaly_threshold",
+        type=float,
+        default=0.5,
+        help="Confidence below which a clip is flagged 'Anomaly / Tactical "
+             "Deviation' (high softmax entropy).",
     )
     return parser.parse_args()
 

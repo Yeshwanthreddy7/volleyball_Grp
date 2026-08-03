@@ -70,15 +70,38 @@ try:
 except ImportError:  # pragma: no cover
     HAS_SUPERVISION = False
 
-from mamba_model import FEATURE_COLS, INPUT_DIM, LABEL_NAMES, MambaClassifier
+from mamba_model import FEATURE_COLS, LABEL_NAMES
 from label_clips import LABEL_TO_INDEX, generate_report, label_clip
 from features import (
+    MODEL_FEATURE_COLS,
     build_model_sequence,
+    interpolate_gaps,
+    kinematic_features,
     raw_frame_to_arrays,
     recover_identity,
     sync_score as _id_sync_score,
     convex_hull_area,
 )
+from interfaces import (
+    DEFAULT_IMGSZ,
+    ClassificationResult,
+    TorchTemporalClassifier,
+    create_detector,
+    create_temporal_classifier,
+    shannon_entropy_bits,
+)
+from tracking import create_tracker
+from identity import SlotManager
+from teams import (
+    TeamClassifier,
+    TeamVoter,
+    NEAR as TEAM_NEAR,
+    FAR as TEAM_FAR,
+    UNKNOWN as TEAM_UNKNOWN,
+)
+import preflight
+from court import CourtCalibrator
+from pose import PoseEstimator, PoseFrameSummary
 
 
 # ---------------------------------------------------------------------------
@@ -87,6 +110,8 @@ from features import (
 
 PERSON_CLASS_ID = 0        # COCO class 0 = person
 SPORTS_BALL_CLASS_ID = 32  # COCO class 32 = sports ball (standard COCO model)
+
+
 SEQ_LEN = 29               # frames per sequence (matches training window)
 N_PLAYERS = 6              # players tracked per sequence
 
@@ -111,6 +136,7 @@ LABEL_COLORS: dict[str, tuple[int, int, int]] = {
     "Coordinated Defense": (255, 0, 0),      # BGR: blue
     "Delayed Support":     (255, 255, 0),    # BGR: cyan
     "Spacing Breakdown":   (0, 0, 255),      # BGR: red
+    "Unclassified":        (140, 140, 140),  # BGR: grey – noise sink (class 0)
 }
 FOURCC = cv2.VideoWriter_fourcc(*"mp4v")
 
@@ -128,41 +154,48 @@ DISPLAY_NAMES: dict[str, str] = {
     "Coordinated Defense": "DEFENDING",
     "Delayed Support":     "DELAYED SUPPORT",
     "Spacing Breakdown":   "SPACING BREAKDOWN",
+    "Unclassified":        "TRANSITION / DEAD BALL",
 }
 
 
 # ---------------------------------------------------------------------------
-# Model loading helpers
+# The class-0 activity gate (spec §4B – the noise sink)
 # ---------------------------------------------------------------------------
 
-def _load_mamba(
-    path: str, device: torch.device
-) -> tuple[MambaClassifier, torch.Tensor, torch.Tensor]:
-    """Load a Mamba checkpoint; return (model, norm_mean, norm_std)."""
-    ckpt = torch.load(path, map_location=device, weights_only=False)
-    if ckpt.get("feature_version") != "perm_invariant_v1":
-        print(
-            "[WARNING] Checkpoint was trained on the OLD raw-coordinate features.\n"
-            "          The pipeline now feeds permutation-invariant features, so\n"
-            "          predictions from this checkpoint will be INVALID.\n"
-            "          Retrain with train_mamba.py (it tags new checkpoints).",
-            file=sys.stderr,
-        )
-    saved_args = ckpt.get("args", {})
-    model = MambaClassifier(
-        input_dim=saved_args.get("input_dim", INPUT_DIM),
-        d_model=saved_args.get("d_model", 64),
-        n_layers=saved_args.get("n_layers", 4),
-        d_state=saved_args.get("d_state", 16),
-        d_conv=saved_args.get("d_conv", 4),
-        num_classes=len(LABEL_NAMES),
-        dropout=0.0,
-    )
-    model.load_state_dict(ckpt["model_state"])
-    model.to(device).eval()
-    mean = ckpt["norm_mean"].to(device)
-    std = ckpt["norm_std"].to(device)
-    return model, mean, std
+def _activity_gate(
+    seq_raw: np.ndarray,
+    min_mean_speed_cm: float = 2.0,
+    min_players: float = 3.0,
+) -> tuple[bool, dict[str, float]]:
+    """
+    Decide whether a 29-frame window is real play or dead-ball noise.
+
+    Forcing celebrations / huddles / service prep into a tactical class would
+    poison the model's gradients (and its report).  A window is routed to
+    class 0 ("Unclassified / Transition") when EITHER:
+      • mean per-player speed is below `min_mean_speed_cm` cm/frame
+        (≈ 0.6 m/s at 30 fps: below deliberate walking pace), or
+      • fewer than `min_players` players are visible on average (camera cut,
+        replay, crowd shot – the 6-player matrix is not observable).
+
+    Returns (is_dead_ball, gate_metrics).
+    """
+    players, _ = raw_frame_to_arrays(seq_raw)
+    tracked = interpolate_gaps(recover_identity(players))
+
+    n_present = float(np.mean([
+        (~np.isnan(f).any(axis=1)).sum() for f in tracked
+    ]))
+
+    disp = np.diff(tracked, axis=0)
+    speed = np.linalg.norm(disp, axis=-1)            # (T-1, K) cm/frame
+    mean_speed = float(np.nanmean(speed)) if np.isfinite(speed).any() else 0.0
+
+    gate = {
+        "gate_mean_speed_cm_frame": round(mean_speed, 2),
+        "gate_players_present": round(n_present, 2),
+    }
+    return (mean_speed < min_mean_speed_cm) or (n_present < min_players), gate
 
 
 # ---------------------------------------------------------------------------
@@ -262,118 +295,96 @@ class BallTracker:
 
 
 # ---------------------------------------------------------------------------
-# Homography helper
+# Side-of-net filtering (uses the live calibrator, spec §3)
 # ---------------------------------------------------------------------------
 
-def _build_homography(corners: list[tuple[float, float]]) -> np.ndarray:
+_SIDE_FILTER_WARNED = False
+
+
+def _preflight_sample(cap, detector, calibrator, args, n_samples: int = 24) -> dict:
     """
-    Compute a perspective homography that maps four pixel corner points
-    (TL, TR, BR, BL order) to the 1800 × 900 cm court coordinate system.
+    Measure the surviving player population at each stage on a sample of the
+    frames that are about to be processed.
 
-    Parameters
-    ----------
-    corners : [(x0,y0), (x1,y1), (x2,y2), (x3,y3)]  pixel coordinates
-              in top-left → top-right → bottom-right → bottom-left order.
-
-    Returns
-    -------
-    H : (3,3) homography matrix
+    Sampling is spread across the requested segment rather than taken from its
+    first frames: broadcast footage opens on replays, graphics and crowd shots,
+    and a contiguous sample from frame 0 would measure those instead of the
+    rally.  Uses the geometric team split for the team-stage estimate because
+    the colour model is not fitted yet - which makes the estimate conservative
+    (geometry over-counts by passing both front rows), so a FATAL team verdict
+    from preflight is never a false alarm.
     """
-    src = np.array(corners, dtype=np.float32)
-    # Destination: the four court corners in cm
-    dst = np.array(
-        [[0, 0], [COURT_W_CM, 0], [COURT_W_CM, COURT_H_CM], [0, COURT_H_CM]],
-        dtype=np.float32,
-    )
-    H, _ = cv2.findHomography(src, dst)
-    return H
+    start = max(int(args.start_frame), 0)
+    total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) or 0
+    end = total if args.max_frames <= 0 else min(total, start + int(args.max_frames))
+    if end <= start:
+        end = start + n_samples
+    idxs = np.linspace(start, max(end - 1, start), num=max(n_samples, 1)).astype(int)
+
+    raw, masked, team = [], [], []
+    ball_hits = 0
+    n_read = 0
+
+    for i in idxs:
+        cap.set(cv2.CAP_PROP_POS_FRAMES, int(i))
+        ok, frame = cap.read()
+        if not ok:
+            continue
+        n_read += 1
+        calibrator.update(frame)
+
+        det = detector.predict(frame)
+        raw.append(len(det.person_xyxy))
+        if det.ball_center is not None:
+            ball_hits += 1
+
+        mx, mc = calibrator.filter_detections(det.person_xyxy, det.person_conf)
+        masked.append(len(mx))
+
+        tx, tc = _filter_players_by_team_side(
+            mx, mc, calibrator, args.team_side, args.net_margin_cm
+        )
+        team.append(len(tx))
+
+    def _median(v):
+        return float(np.median(v)) if v else 0.0
+
+    return {
+        "n_frames": n_read,
+        "raw_person_median": _median(raw),
+        "masked_person_median": _median(masked),
+        "team_person_median": _median(team),
+        "ball_recall": (ball_hits / n_read) if n_read else 0.0,
+    }
 
 
-def _pixel_to_court(
-    px: float,
-    py: float,
-    frame_w: int,
-    frame_h: int,
-    H: np.ndarray | None,
-) -> tuple[float, float]:
-    """Convert a single pixel position to court coordinates (cm)."""
-    if H is not None:
-        pt = np.array([[[px, py]]], dtype=np.float32)
-        out = cv2.perspectiveTransform(pt, H)
-        return float(out[0, 0, 0]), float(out[0, 0, 1])
-    # Fallback: linear scaling
-    return px / frame_w * COURT_W_CM, py / frame_h * COURT_H_CM
-
-
-# ---------------------------------------------------------------------------
-# Detection (YOLOv8)
-# ---------------------------------------------------------------------------
-
-def _detect(
-    frame: np.ndarray,
-    yolo: "YOLO",
-    conf_threshold: float = 0.35,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray | None]:
+def _team_labels_geometric(court_ys, net_margin_cm: float) -> np.ndarray:
     """
-    Run YOLOv8 on *frame*.
+    NEAR/FAR label per detection from the foot point alone.
 
-    Returns
-    -------
-    person_xyxy : (N, 4) bounding boxes for detected persons
-    person_conf : (N,) confidence scores
-    ball_center : (2,) pixel position of the highest-confidence ball, or None
+    Used (a) as the colour model's warm-up fallback and (b) as the label source
+    that tells the colour clusters which side they belong to.  Players within
+    `net_margin_cm` of the net are genuinely ambiguous geometrically - that is
+    the whole reason the colour model exists - so they are marked UNKNOWN here
+    rather than guessed.
     """
-    results = yolo(frame, verbose=False, conf=conf_threshold)[0]
-    boxes = results.boxes
-
-    cls_ids = boxes.cls.int().cpu().numpy()
-    xyxy = boxes.xyxy.cpu().numpy()
-    conf = boxes.conf.cpu().numpy()
-
-    # Persons
-    person_mask = cls_ids == PERSON_CLASS_ID
-    person_xyxy = xyxy[person_mask]
-    person_conf = conf[person_mask]
-
-    # Sports ball (class 32) – may be absent in sport-specific YOLOv8 weights
-    ball_center: np.ndarray | None = None
-    ball_mask = cls_ids == SPORTS_BALL_CLASS_ID
-    if ball_mask.any():
-        ball_boxes = xyxy[ball_mask]
-        ball_confs = conf[ball_mask]
-        best = int(np.argmax(ball_confs))
-        x1, y1, x2, y2 = ball_boxes[best]
-        ball_center = np.array([(x1 + x2) / 2.0, (y1 + y2) / 2.0], dtype=float)
-
-    return person_xyxy, person_conf, ball_center
-
-
-# ---------------------------------------------------------------------------
-# Tracking (ByteTrack)
-# ---------------------------------------------------------------------------
-
-def _track(
-    person_xyxy: np.ndarray,
-    person_conf: np.ndarray,
-    tracker: "sv.ByteTrack",
-) -> "sv.Detections":
-    """Update ByteTrack and return annotated Detections with tracker_id."""
-    if len(person_xyxy) == 0:
-        return sv.Detections.empty()
-    detections = sv.Detections(
-        xyxy=person_xyxy,
-        confidence=person_conf,
-        class_id=np.zeros(len(person_xyxy), dtype=int),
-    )
-    return tracker.update_with_detections(detections)
+    out = []
+    for y in np.asarray(court_ys, dtype=float).reshape(-1):
+        if not np.isfinite(y):
+            out.append(TEAM_UNKNOWN)
+        elif y >= NET_Y_CM + net_margin_cm:
+            out.append(TEAM_NEAR)
+        elif y <= NET_Y_CM - net_margin_cm:
+            out.append(TEAM_FAR)
+        else:
+            out.append(TEAM_UNKNOWN)
+    return np.array(out, dtype=int)
 
 
 def _filter_players_by_team_side(
     person_xyxy: np.ndarray,
     person_conf: np.ndarray,
-    frame_w: int,
-    frame_h: int,
-    H: np.ndarray | None,
+    calibrator: CourtCalibrator,
     team_side: str,
     net_margin_cm: float,
 ) -> tuple[np.ndarray, np.ndarray]:
@@ -384,6 +395,10 @@ def _filter_players_by_team_side(
       - "bottom": keep players with court_y >= NET_Y_CM + net_margin_cm
       - "top"   : keep players with court_y <= NET_Y_CM - net_margin_cm
       - "all"   : keep every detected player
+
+    Positions are evaluated at the FOOT POINT (bottom-centre of the box) via
+    the CURRENT homography, which follows the camera when CMC / auto-court is
+    enabled.
     """
     if team_side == "all" or len(person_xyxy) == 0:
         return person_xyxy, person_conf
@@ -391,8 +406,8 @@ def _filter_players_by_team_side(
     keep_indices: list[int] = []
     for i, (x1, y1, x2, y2) in enumerate(person_xyxy):
         px = float((x1 + x2) / 2.0)
-        py = float((y1 + y2) / 2.0)
-        _, court_y = _pixel_to_court(px, py, frame_w, frame_h, H)
+        py = float(y2)                       # foot point, not centroid
+        _, court_y = calibrator.pixel_to_court(px, py)
 
         if team_side == "bottom":
             on_side = court_y >= (NET_Y_CM + net_margin_cm)
@@ -403,6 +418,15 @@ def _filter_players_by_team_side(
             keep_indices.append(i)
 
     if not keep_indices:
+        global _SIDE_FILTER_WARNED
+        if len(person_xyxy) >= 4 and not _SIDE_FILTER_WARNED:
+            _SIDE_FILTER_WARNED = True
+            print(
+                "[WARNING] team-side filter removed ALL {} detections in a "
+                "frame - court calibration and --team-side may disagree "
+                "(shown once).".format(len(person_xyxy)),
+                file=sys.stderr,
+            )
         return (
             np.empty((0, 4), dtype=person_xyxy.dtype),
             np.empty((0,), dtype=person_conf.dtype),
@@ -417,12 +441,11 @@ def _filter_players_by_team_side(
 # ---------------------------------------------------------------------------
 
 def _extract_positions(
-    tracks: "sv.Detections",
+    tracked_xyxy: np.ndarray,
+    track_ids: np.ndarray,
     ball_center: np.ndarray | None,
-    frame_w: int,
-    frame_h: int,
-    H: np.ndarray | None,
-    slot_map: dict[int, int],
+    calibrator: CourtCalibrator,
+    slot_map: "dict[int, int] | SlotManager",
 ) -> tuple[np.ndarray, np.ndarray]:
     """
     Convert ByteTrack detections to court coordinates with a STABLE, identity-
@@ -453,39 +476,44 @@ def _extract_positions(
     player_positions : (6, 2) court-cm coords; NaN rows for empty slots.
     ball_pos         : (2,) court-cm coords; NaN if ball unknown.
     """
-    # Foot point (bottom-centre) per active track ID.
-    feet: dict[int, tuple[float, float]] = {}
-    if tracks.tracker_id is not None and len(tracks.xyxy) > 0:
-        for tid, (x1, y1, x2, y2) in zip(tracks.tracker_id, tracks.xyxy):
-            feet[int(tid)] = ((x1 + x2) / 2.0, y2)  # foot = bottom-centre
+    # Foot point (bottom-centre) per active track ID, in court cm.
+    court_feet: dict[int, tuple[float, float]] = {}
+    for tid, (x1, y1, x2, y2) in zip(track_ids, tracked_xyxy):
+        cx, cy = calibrator.pixel_to_court((x1 + x2) / 2.0, y2)
+        court_feet[int(tid)] = (cx, cy)  # foot = bottom-centre
 
-    # Persistent slot assignment: keep existing slots, fill free slots for new IDs.
-    used_slots = {s for s in slot_map.values()}
-    for tid in feet:
-        if tid not in slot_map:
-            free = next((s for s in range(N_PLAYERS) if s not in used_slots), None)
-            if free is not None:
-                slot_map[tid] = free
-                used_slots.add(free)
-
-    # Release slots whose track is no longer visible so they can be reused later.
-    for tid in [t for t in slot_map if t not in feet]:
-        # keep the mapping but allow its slot to be reclaimed once another new
-        # track needs it: simplest correct behaviour is to drop stale IDs.
-        del slot_map[tid]
+    if isinstance(slot_map, SlotManager):
+        # Online identity bridge (stage 1): a slot survives <=15-frame
+        # occlusions in limbo, and a NEW tracker id appearing within a
+        # court-distance gate of the vacated position inherits the slot -
+        # column p_i stays the same physical player across tracker re-ids.
+        # (Stage 2, recover_identity + interpolate_gaps in features.py,
+        # still repairs anything that slips through, for train AND serve.)
+        id_to_slot = slot_map.assign(court_feet)
+    else:
+        # Legacy dict behaviour (kept for backward compatibility).
+        used_slots = {s for s in slot_map.values()}
+        for tid in court_feet:
+            if tid not in slot_map:
+                free = next((s for s in range(N_PLAYERS) if s not in used_slots), None)
+                if free is not None:
+                    slot_map[tid] = free
+                    used_slots.add(free)
+        for tid in [t for t in slot_map if t not in court_feet]:
+            del slot_map[tid]
+        id_to_slot = dict(slot_map)
 
     player_positions = np.full((N_PLAYERS, 2), np.nan, dtype=float)
-    for tid, (px, py) in feet.items():
-        slot = slot_map.get(tid)
+    for tid, (cx, cy) in court_feet.items():
+        slot = id_to_slot.get(tid)
         if slot is None:
             continue
-        cx, cy = _pixel_to_court(px, py, frame_w, frame_h, H)
         player_positions[slot] = [cx, cy]
 
     # Ball
     if ball_center is not None:
-        bx, by = _pixel_to_court(
-            float(ball_center[0]), float(ball_center[1]), frame_w, frame_h, H
+        bx, by = calibrator.pixel_to_court(
+            float(ball_center[0]), float(ball_center[1])
         )
         ball_pos = np.array([bx, by], dtype=float)
     else:
@@ -515,7 +543,7 @@ def _compute_frame_features(
     -------
     row : (14,) float32 feature vector
     """
-    row = np.empty(INPUT_DIM, dtype=np.float32)
+    row = np.empty(len(FEATURE_COLS), dtype=np.float32)
     row[0] = ball_pos[0]
     row[1] = ball_pos[1]
     for i in range(N_PLAYERS):
@@ -535,6 +563,7 @@ def _sequence_metrics(seq: np.ndarray) -> dict[str, float]:
     """
     players, _ = raw_frame_to_arrays(seq)          # (T,6,2), NaN = missing
     tracked = recover_identity(players)            # fix identity (L1)
+    tracked = interpolate_gaps(tracked)            # bridge <=15-frame occlusion
 
     sync = _id_sync_score(tracked)
 
@@ -557,70 +586,70 @@ def _sequence_metrics(seq: np.ndarray) -> dict[str, float]:
     cvel = np.linalg.norm(np.diff(centroids, axis=0), axis=1)
     centroid_vel = float(np.nanmean(cvel)) if np.isfinite(cvel).any() else 0.0
 
+    # Spatial variance (spec §1B): mean squared distance to the team centroid.
+    var_samples: list[float] = []
+    for f, c in zip(tracked, centroids):
+        occ = f[~np.isnan(f).any(axis=1)]
+        if len(occ) >= 2 and np.all(np.isfinite(c)):
+            var_samples.append(float(np.mean(np.sum((occ - c) ** 2, axis=1))))
+    var_spatial = float(np.mean(var_samples)) if var_samples else 0.0
+
+    # Top-2 / bottom-4 speed differential (spec §1B), mean over the window.
+    kin = kinematic_features(tracked)              # (T, 4)
+    speed_top2 = float(kin[1:, 0].mean()) if len(kin) > 1 else 0.0
+    speed_bot4 = float(kin[1:, 1].mean()) if len(kin) > 1 else 0.0
+
     return {
         "sync_score": round(sync, 4),
         "mean_spacing_cm": round(mean_spacing, 1),
         "centroid_vel_cm_per_frame": round(centroid_vel, 2),
+        "var_spatial_cm2": round(var_spatial, 1),
+        "speed_top2_cm_frame": round(speed_top2, 2),
+        "speed_bot4_cm_frame": round(speed_bot4, 2),
+        "speed_diff_cm_frame": round(speed_top2 - speed_bot4, 2),
     }
 
 
 # ---------------------------------------------------------------------------
-# Mamba inference (Sequence Learning + Classification)
+# Sequence classification (temporal-model interface, spec §5B)
 # ---------------------------------------------------------------------------
 
-def _classify_sequence(
-    seq: np.ndarray,            # (29, 14) float32
-    model: MambaClassifier,
-    mean: torch.Tensor,
-    std: torch.Tensor,
-    device: torch.device,
-) -> tuple[str, int, float, torch.Tensor]:
+def _classify_sequence_rule_based(seq: np.ndarray) -> ClassificationResult:
     """
-    Classify a 29-frame feature sequence with the trained Mamba model.
+    Classify a 29-frame RAW sequence using the rule-based engine from
+    label_clips (fallback when no trained checkpoint is supplied).
 
-    Returns
-    -------
-    label      : predicted label string
-    label_idx  : 1-based numeric index
-    confidence : softmax probability of predicted class
-    probs      : (num_classes,) probability tensor
-    """
-    t = torch.from_numpy(seq).to(device)   # (29, 14)
-    t = (t - mean) / std                   # z-score normalisation
-    with torch.no_grad():
-        logits = model(t.unsqueeze(0))     # (1, num_classes)
-        probs = F.softmax(logits, dim=-1)[0]
-    pred_idx = int(probs.argmax().item())
-    label = LABEL_NAMES[pred_idx]
-    conf = float(probs[pred_idx].item())
-    numeric_idx = LABEL_TO_INDEX.get(label, 0)
-    return label, numeric_idx, conf, probs
-
-
-def _classify_sequence_rule_based(seq: np.ndarray) -> tuple[str, int, float, None]:
-    """
-    Classify a 29-frame sequence using the rule-based engine from label_clips.
-
-    Converts the numpy feature array to a DataFrame matching the format
-    expected by label_clip() and applies the four labeling rules.
-
-    Returns
-    -------
-    label      : predicted label string
-    label_idx  : 1-based numeric index
-    confidence : 1.0 (rule-based decisions are deterministic)
-    probs      : None  (no probability vector in rule-based mode)
+    "Unclassified" is a legitimate first-class outcome here (class 0, the
+    noise sink) – the old behaviour of coercing it into "Spacing Breakdown"
+    polluted the report with phantom structural failures.
     """
     # The legacy rule engine expects the (0,0) sentinel for missing, not NaN.
     seq_legacy = np.nan_to_num(seq, nan=0.0)
     df = pd.DataFrame(seq_legacy, columns=FEATURE_COLS)
     df.insert(0, "frame_id", range(1, len(df) + 1))
     label = label_clip(df)
-    if label == "Unclassified":
-        # Default to Spacing Breakdown when no rule fires (rare edge case)
-        label = "Spacing Breakdown"
-    numeric_idx = LABEL_TO_INDEX.get(label, 0)
-    return label, numeric_idx, 1.0, None
+    return ClassificationResult(
+        label=label,
+        numeric_idx=LABEL_TO_INDEX.get(label, 0),
+        confidence=1.0,
+        entropy=0.0,
+        entropy_norm=0.0,
+        is_anomaly=False,
+        probs={},
+    )
+
+
+def _unclassified_result(gate: dict[str, float]) -> ClassificationResult:
+    """ClassificationResult for a window routed to the class-0 noise sink."""
+    return ClassificationResult(
+        label="Unclassified",
+        numeric_idx=LABEL_TO_INDEX.get("Unclassified", 0),
+        confidence=1.0,
+        entropy=0.0,
+        entropy_norm=0.0,
+        is_anomaly=False,
+        probs={},
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -629,7 +658,8 @@ def _classify_sequence_rule_based(seq: np.ndarray) -> tuple[str, int, float, Non
 
 def _annotate_frame(
     frame: np.ndarray,
-    tracks: "sv.Detections",
+    tracked_xyxy: np.ndarray,
+    track_ids: np.ndarray,
     ball_center: np.ndarray | None,
     ball_is_predicted: bool,
     ball_trail: "deque[tuple[int, int, bool]]",
@@ -637,6 +667,11 @@ def _annotate_frame(
     current_conf: float,
     frame_idx: int,
     fps: float,
+    calibrator: CourtCalibrator | None = None,
+    hud_metrics: dict | None = None,
+    current_entropy: float = 0.0,
+    is_anomaly: bool = False,
+    pose_summary: "PoseFrameSummary | None" = None,
 ) -> np.ndarray:
     """
     Draw tracking boxes, ball trail + marker, frame info, and current label.
@@ -675,10 +710,13 @@ def _annotate_frame(
     banner_bg  = LABEL_COLORS.get(current_label, LABEL_BG_COLOR)
     display_name = DISPLAY_NAMES.get(current_label, current_label) if current_label else ""
 
-    # Net reference line to make side-of-net filtering explicit in output.
-    net_y_px = int(round(h * (NET_Y_CM / COURT_H_CM)))
-    cv2.line(out, (0, net_y_px), (w, net_y_px), (180, 180, 180), 1, cv2.LINE_AA)
-    cv2.putText(out, "NET", (10, max(20, net_y_px - 8)), FONT, 0.45, (180, 180, 180), 1, cv2.LINE_AA)
+    # Court polygon overlay (dynamic homography) or net reference line.
+    if calibrator is not None and calibrator.corners is not None:
+        calibrator.draw(out)
+    else:
+        net_y_px = int(round(h * (NET_Y_CM / COURT_H_CM)))
+        cv2.line(out, (0, net_y_px), (w, net_y_px), (180, 180, 180), 1, cv2.LINE_AA)
+        cv2.putText(out, "NET", (10, max(20, net_y_px - 8)), FONT, 0.45, (180, 180, 180), 1, cv2.LINE_AA)
 
     # ── Ball trail (detected = orange fading, predicted = grey fading) ─────────
     trail_list = list(ball_trail)
@@ -700,21 +738,26 @@ def _annotate_frame(
             ), -1, cv2.LINE_AA)
 
     # ── Player bounding boxes (colour reflects current tactical label) ─────────
-    if tracks.tracker_id is not None and len(tracks.xyxy) > 0:
-        for tid, (x1, y1, x2, y2) in zip(tracks.tracker_id, tracks.xyxy):
+    if len(tracked_xyxy) > 0:
+        pose_tracks = pose_summary.per_track if pose_summary else {}
+        for tid, (x1, y1, x2, y2) in zip(track_ids, tracked_xyxy):
             x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
             cv2.rectangle(out, (x1, y1), (x2, y2), box_color, 2)
+            tag = f"P {tid}"
+            info = pose_tracks.get(int(tid))
+            if info is not None and info.get("airborne"):
+                tag += f"  JUMP {info['vy_ms']:.1f} m/s"
             cv2.putText(
-                out, f"P {tid}", (x1, y1 - 6),
+                out, tag, (x1, y1 - 6),
                 FONT, 0.45, box_color, 1, cv2.LINE_AA,
             )
 
     # Large action-focus box highlighting the active team region.
-    if current_label and tracks.tracker_id is not None and len(tracks.xyxy) > 0:
-        x1 = int(np.min(tracks.xyxy[:, 0]))
-        y1 = int(np.min(tracks.xyxy[:, 1]))
-        x2 = int(np.max(tracks.xyxy[:, 2]))
-        y2 = int(np.max(tracks.xyxy[:, 3]))
+    if current_label and len(tracked_xyxy) > 0:
+        x1 = int(np.min(tracked_xyxy[:, 0]))
+        y1 = int(np.min(tracked_xyxy[:, 1]))
+        x2 = int(np.max(tracked_xyxy[:, 2]))
+        y2 = int(np.max(tracked_xyxy[:, 3]))
 
         pad_x = max(24, int(0.06 * max(1, x2 - x1)))
         pad_y = max(20, int(0.08 * max(1, y2 - y1)))
@@ -756,6 +799,41 @@ def _annotate_frame(
         out, f"Frame {frame_idx:05d}  {ts:.2f}s",
         (10, 28), FONT, 0.65, TEXT_COLOR, 2, cv2.LINE_AA,
     )
+
+    # ── HUD: live team metrics (spec §6.3) ─────────────────────────────────────
+    hud_lines: list[str] = []
+    if hud_metrics:
+        cvel_cms = hud_metrics.get("centroid_vel_cm_per_frame", 0.0) * fps
+        hud_lines += [
+            f"sync      {hud_metrics.get('sync_score', 0.0):+.2f}",
+            f"spacing   {hud_metrics.get('mean_spacing_cm', 0.0):.0f} cm",
+            f"team vel  {cvel_cms:.0f} cm/s",
+            f"var_spat  {hud_metrics.get('var_spatial_cm2', 0.0):.0f} cm2",
+            f"spd t2/b4 {hud_metrics.get('speed_top2_cm_frame', 0.0):.1f}/"
+            f"{hud_metrics.get('speed_bot4_cm_frame', 0.0):.1f}",
+            f"entropy   {current_entropy:.2f} bits",
+        ]
+    if pose_summary is not None and pose_summary.per_track:
+        hud_lines.append(f"max Vy    {pose_summary.max_vy_up:.1f} m/s")
+        hud_lines.append(f"arm omega {pose_summary.max_arm_omega:.0f} rad/s")
+    if is_anomaly:
+        hud_lines.append("!! TACTICAL DEVIATION !!")
+
+    if hud_lines:
+        pad, lh = 8, 20
+        hud_w = 240
+        hud_h = pad * 2 + lh * len(hud_lines)
+        x0 = w - hud_w - 10
+        y0 = 10
+        overlay_hud = out.copy()
+        cv2.rectangle(overlay_hud, (x0, y0), (x0 + hud_w, y0 + hud_h), (20, 20, 20), -1)
+        cv2.addWeighted(overlay_hud, 0.65, out, 0.35, 0, out)
+        for i, line in enumerate(hud_lines):
+            color = (0, 0, 255) if line.startswith("!!") else TEXT_COLOR
+            cv2.putText(
+                out, line, (x0 + pad, y0 + pad + lh * (i + 1) - 6),
+                FONT, 0.5, color, 1, cv2.LINE_AA,
+            )
 
     # ── Label banner at the bottom of the frame ────────────────────────────────
     big_scale, big_thick = 1.1, 2
@@ -825,22 +903,37 @@ def run_pipeline(args: argparse.Namespace) -> None:
         "cpu"
     )
 
-    # ── Load models ─────────────────────────────────────────────────────────
-    print(f"Loading YOLOv8 model : {args.yolo_model}")
-    yolo = YOLO(args.yolo_model)
+    # ── Load models (behind the abstract interfaces, spec §5) ───────────────
+    print(f"Loading detector model : {args.yolo_model}")
+    if args.ball_model:
+        print(f"Loading ball model     : {args.ball_model}")
+    detector = create_detector(
+        args.yolo_model,
+        ball_weights=args.ball_model,
+        ball_conf_threshold=args.ball_conf_threshold,
+        conf_threshold=args.conf_threshold,
+        person_class_id=args.person_class_id,
+        ball_class_id=args.ball_class_id,
+        imgsz=args.imgsz,
+    )
+    print(f"  Detector backend : {detector.name}")
+    print(f"  Detector classes : {detector.class_names}")
+    print(f"  Using person_id={detector.person_id}  ball_id={detector.ball_id}"
+          + ("" if detector.ball_id is not None
+             else "  (no ball class - ball overlay disabled)"))
 
-    print("Initialising ByteTrack tracker")
-    tracker = sv.ByteTrack()
-
-    model: MambaClassifier | None = None
-    norm_mean: torch.Tensor | None = None
-    norm_std: torch.Tensor | None = None
-
+    classifier: TorchTemporalClassifier | None = None
     if args.checkpoint:
-        print(f"Loading Mamba checkpoint : {args.checkpoint}")
+        print(f"Loading temporal-model checkpoint : {args.checkpoint}")
         try:
-            model, norm_mean, norm_std = _load_mamba(args.checkpoint, device)
-            print(f"Device: {device}")
+            # Backend chosen from the file extension: .joblib -> scikit-learn
+            # tactical model, anything else -> torch checkpoint.
+            classifier = create_temporal_classifier(
+                args.checkpoint,
+                device=device,
+                anomaly_threshold=args.anomaly_threshold,
+            )
+            print(f"  Temporal backend : {classifier.name}   Device: {device}")
         except FileNotFoundError:
             print(
                 f"[WARNING] Checkpoint not found: {args.checkpoint}\n"
@@ -848,30 +941,15 @@ def run_pipeline(args: argparse.Namespace) -> None:
                 file=sys.stderr,
             )
     else:
-        print("No Mamba checkpoint supplied – using rule-based classification.")
+        print("No checkpoint supplied – using rule-based classification.")
 
-    # ── Homography ──────────────────────────────────────────────────────────
-    H: np.ndarray | None = None
-    if args.court_corners:
-        H = _build_homography(args.court_corners)
-        print("Court homography computed from supplied corner points.")
-    else:
-        print(
-            f"No court corners supplied – pixel coords scaled to "
-            f"{COURT_W_CM:.0f}×{COURT_H_CM:.0f} cm."
-        )
+    # ── Pose estimator (17-keypoint biomechanics, spec §1A) ─────────────────
+    pose: PoseEstimator | None = None
+    if args.pose:
+        print(f"Loading pose model : {args.pose_model}")
+        pose = PoseEstimator(args.pose_model, fps=30.0)
 
-    side_name = {
-        "top": "TOP side of net",
-        "bottom": "BOTTOM side of net",
-        "all": "ALL players (no side filtering)",
-    }[args.team_side]
-    print(
-        f"Team-side filter: {side_name} "
-        f"(net margin: {args.net_margin_cm:.1f} cm)"
-    )
-
-    # ── Open video ───────────────────────────────────────────────────────────
+    # ── Open video (need fps before tracker/calibrator construction) ────────
     print(f"\nOpening video: {args.video}")
     cap = cv2.VideoCapture(args.video)
     if not cap.isOpened():
@@ -883,6 +961,47 @@ def run_pipeline(args: argparse.Namespace) -> None:
     frame_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     print(f"  {frame_w}×{frame_h}  {fps:.2f} FPS  ~{total_frames} frames")
+    if pose is not None:
+        pose._fps = fps
+
+    # ── Tracker (paradigm switch + Kalman tuning, spec §2) ──────────────────
+    tracker = create_tracker(
+        args.tracker, fps=fps, q_scale=args.kalman_q_scale, with_reid=args.reid
+    )
+    print(f"Tracker : {tracker.name}")
+
+    # ── Court calibration (dynamic homography + CMC + mask, spec §3) ────────
+    calibrator = CourtCalibrator(
+        frame_w, frame_h,
+        manual_corners=args.court_corners,
+        auto=args.auto_court,
+        cmc=args.cmc,
+        refresh_every=args.court_refresh,
+        force_linear=(args.court_coords == "linear"),
+    )
+    if args.court_corners:
+        print("Court homography computed from supplied corner points"
+              + (" (CMC keeps it aligned under camera motion)." if args.cmc else "."))
+    elif args.auto_court:
+        print(f"Automatic court detection every {args.court_refresh} frames"
+              + (" + CMC between refreshes." if args.cmc else "."))
+    else:
+        print(
+            f"No court corners supplied – pixel coords scaled to "
+            f"{COURT_W_CM:.0f}×{COURT_H_CM:.0f} cm (court mask disabled)."
+        )
+
+    side_name = {
+        "top": "TOP side of net",
+        "bottom": "BOTTOM side of net",
+        "all": "ALL players (no side filtering)",
+    }[args.team_side]
+    print(
+        f"Team-side filter: {side_name} "
+        f"(net margin: {args.net_margin_cm:.1f} cm)"
+    )
+    print(f"Class-0 gate: mean speed < {args.gate_speed_cm:.1f} cm/frame or "
+          f"< {args.gate_min_players:.0f} players visible -> Unclassified")
 
     # ── Output video writer ──────────────────────────────────────────────────
     writer: cv2.VideoWriter | None = None
@@ -900,16 +1019,68 @@ def run_pipeline(args: argparse.Namespace) -> None:
 
     # ── State variables ──────────────────────────────────────────────────────
     seq_buffer: list[np.ndarray] = []   # accumulates (14,) raw rows → 29 frames
-    slot_map: dict[int, int] = {}       # track_id → persistent player slot (L1 fix)
+    frame_buffer: list[dict] = []       # per-frame records of current window
+    slot_map = SlotManager()            # persistent slots + occlusion bridge (L1 fix)
     ball_tracker = BallTracker()        # constant-velocity ball tracker
+    # Jersey-colour team separation. Disabled for --team-side all (nothing to
+    # separate) and in explicit --team-split geometric mode.
+    team_clf: TeamClassifier | None = None
+    team_voter = TeamVoter()
+    if args.team_split == "colour" and args.team_side != "all":
+        team_clf = TeamClassifier(
+            n_clusters=args.team_clusters,
+            warmup_frames=args.team_warmup_frames,
+            net_y_cm=NET_Y_CM,
+        )
+        print(f"Team split: jersey colour ({args.team_clusters} clusters, "
+              f"{args.team_warmup_frames}-frame warm-up, per-track vote)")
+    else:
+        print("Team split: geometric (foot point vs net line)")
     ball_trail: deque[tuple[int, int, bool]] = deque(maxlen=BALL_TRAIL_LEN)
     label_counts: dict[str, int] = defaultdict(int)
     predictions: list[dict] = []
+    frame_rows: list[dict] = []         # frame-level CSV (spec §6.2)
+    anomaly_count = 0
+    masked_out_total = 0
 
     frame_idx = 0
     seq_idx = 0
     current_label = ""
     current_conf = 0.0
+    current_entropy = 0.0
+    current_anomaly = False
+    current_metrics: dict = {}
+
+    # ── PREFLIGHT: prove the population is sane before analysing anything ───
+    if not args.skip_preflight:
+        stats = _preflight_sample(
+            cap, detector, calibrator, args,
+            n_samples=args.preflight_frames,
+        )
+        verdict = preflight.assess(stats)
+        print("\nPreflight check")
+        print(preflight.summarise(stats))
+        print(verdict.render())
+        if verdict.fatal:
+            print(
+                "\n[ABORT] Preflight found a fatal problem. A tactical report "
+                "built on this input would be meaningless, so the run is "
+                "stopping instead of producing one.\n"
+                "        Override with --skip-preflight if you are debugging.",
+                file=sys.stderr,
+            )
+            cap.release()
+            sys.exit(2)
+        # Rewind: the sampler consumed frames from the capture.
+        cap.set(cv2.CAP_PROP_POS_FRAMES, max(args.start_frame, 0))
+        calibrator = CourtCalibrator(
+            frame_w, frame_h,
+            manual_corners=args.court_corners,
+            auto=args.auto_court,
+            cmc=args.cmc,
+            refresh_every=args.court_refresh,
+            force_linear=(args.court_coords == "linear"),
+        )
 
     print("\nProcessing frames…")
 
@@ -928,98 +1099,192 @@ def run_pipeline(args: argparse.Namespace) -> None:
             print(f"Reached --max-frames limit ({args.max_frames}); stopping.")
             break
 
-        # ── STEP 1 – Frame Extraction (implicit in cap.read) ────────────────
-        # ── STEP 2 – Player Detection (YOLOv8) ─────────────────────────────
-        person_xyxy, person_conf, ball_center = _detect(
-            frame, yolo, args.conf_threshold
+        # ── STEP 1 – Frame Extraction + live calibration update ─────────────
+        calibrator.update(frame)
+
+        # ── STEP 2 – Player + ball detection (abstract detector, §5A) ───────
+        det = detector.predict(frame)
+
+        # Court mask: drop referees / bench / crowd outside the lines (§3C)
+        n_before = len(det.person_xyxy)
+        person_xyxy, person_conf = calibrator.filter_detections(
+            det.person_xyxy, det.person_conf
         )
+        masked_out_total += n_before - len(person_xyxy)
 
-        person_xyxy, person_conf = _filter_players_by_team_side(
-            person_xyxy,
-            person_conf,
-            frame_w,
-            frame_h,
-            H,
-            args.team_side,
-            args.net_margin_cm,
-        )
+        if team_clf is None:
+            # Geometric team split (legacy): decided per frame, BEFORE tracking.
+            person_xyxy, person_conf = _filter_players_by_team_side(
+                person_xyxy, person_conf, calibrator,
+                args.team_side, args.net_margin_cm,
+            )
+            det.person_xyxy, det.person_conf = person_xyxy, person_conf
 
-        # ── STEP 3 – Player Tracking (ByteTrack) ────────────────────────────
-        tracks = _track(person_xyxy, person_conf, tracker)
+            # ── STEP 3 – Player Tracking (ByteTrack / BoT-SORT, §2) ─────────
+            tracked_xyxy, track_ids = tracker.update(det, frame)
+        else:
+            # Colour team split: track EVERY in-court person first, so the
+            # per-frame colour label can be majority-voted over each track's
+            # lifetime (teams.TeamVoter).  Tracking before filtering is also
+            # better for the tracker: it sees a stable population instead of
+            # detections blinking in and out as players cross the net line.
+            det.person_xyxy, det.person_conf = person_xyxy, person_conf
+            tracked_xyxy, track_ids = tracker.update(det, frame)
 
-        # ── Ball tracking: bridge missed YOLO detections with predicted pos ──
-        # BallTracker applies a constant-velocity kinematic model to fill
-        # gaps (up to BALL_MAX_MISS_FRAMES) when the ball is not found by YOLO.
-        tracked_ball, ball_is_predicted = ball_tracker.update(ball_center)
+            court_ys = [
+                calibrator.pixel_to_court(float((x1 + x2) / 2.0), float(y2))[1]
+                for (x1, y1, x2, y2) in tracked_xyxy
+            ]
+            frame_labels = team_clf.update(frame, tracked_xyxy, court_ys)
+            if frame_labels is None or team_clf.degenerate:
+                # Either still warming up, or the fit put every cluster on one
+                # side of the net (no court mask -> crowd dominates the
+                # clusters). Both cases: geometry decides.
+                frame_labels = _team_labels_geometric(
+                    court_ys, args.net_margin_cm
+                )
+            voted = team_voter.update(track_ids, frame_labels)
+            team_voter.forget(track_ids)
 
-        # ── STEP 4 – Pose / Position Extraction ─────────────────────────────
+            want = TEAM_NEAR if args.team_side == "bottom" else TEAM_FAR
+            if args.team_side == "all":
+                keep = np.ones(len(tracked_xyxy), dtype=bool)
+            else:
+                keep = voted == want
+            tracked_xyxy = tracked_xyxy[keep]
+            track_ids = track_ids[keep]
+
+        # ── Ball tracking: bridge missed detections with predicted position ──
+        tracked_ball, ball_is_predicted = ball_tracker.update(det.ball_center)
+
+        # ── STEP 4 – Pose biomechanics (17 keypoints, §1A) ──────────────────
+        pose_summary: PoseFrameSummary | None = None
+        if pose is not None:
+            pose_summary = pose.process(frame, tracked_xyxy, track_ids)
+
+        # ── STEP 5 – Position extraction + feature engineering ──────────────
         player_positions, ball_pos = _extract_positions(
-            tracks, tracked_ball, frame_w, frame_h, H, slot_map
+            tracked_xyxy, track_ids, tracked_ball, calibrator, slot_map
         )
-
-        # ── STEP 5 – Feature Engineering ────────────────────────────────────
         feature_row = _compute_frame_features(player_positions, ball_pos)
         seq_buffer.append(feature_row)
 
-        # ── STEP 6 – Sequence Formation → STEP 7 Mamba → STEP 8 Classification
-        if len(seq_buffer) == SEQ_LEN:
-            seq_array = np.stack(seq_buffer)  # (29, 14)
+        if args.frame_csv:
+            frow: dict = {
+                "frame": frame_idx,
+                "time_s": round(frame_idx / fps, 3),
+                "ball_px_x": round(float(tracked_ball[0]), 1) if tracked_ball is not None else np.nan,
+                "ball_px_y": round(float(tracked_ball[1]), 1) if tracked_ball is not None else np.nan,
+                "ball_predicted": bool(ball_is_predicted),
+                "n_players_tracked": int(len(tracked_xyxy)),
+            }
+            for c, v in zip(FEATURE_COLS, feature_row):
+                frow[f"raw_{c}"] = round(float(v), 1) if np.isfinite(v) else np.nan
+            if pose_summary is not None:
+                frow["pose_max_vy_up_ms"] = pose_summary.max_vy_up
+                frow["pose_max_arm_omega"] = pose_summary.max_arm_omega
+                frow["pose_n_airborne"] = pose_summary.n_airborne
+            frame_buffer.append(frow)
 
-            # Derived metrics (for output CSV)
+        # ── STEP 6 – Sequence Formation → STEP 7 gate → STEP 8 classification
+        if len(seq_buffer) == SEQ_LEN:
+            seq_array = np.stack(seq_buffer)  # (29, 14) raw
+
+            # Derived metrics (for output CSV + HUD)
             metrics = _sequence_metrics(seq_array)
 
-            # Mamba classification or rule-based fallback.
-            # The model consumes the corrected, identity-aware, permutation-
-            # invariant representation – built here so the live pipeline and the
-            # trainer see byte-for-byte identical inputs (train/serve parity).
-            if model is not None:
+            # Class-0 noise sink first (spec §4B): dead-ball windows never
+            # reach the model, so they cannot pollute the tactical report.
+            is_dead, gate_metrics = _activity_gate(
+                seq_array, args.gate_speed_cm, args.gate_min_players
+            )
+            if is_dead and not args.no_gate:
+                result = _unclassified_result(gate_metrics)
+            elif classifier is not None:
+                # The model consumes the corrected, identity-aware,
+                # permutation-invariant representation – built by the same
+                # function the trainer uses (train/serve parity).
                 model_seq = build_model_sequence(seq_array, target_len=SEQ_LEN)
-                label, numeric_idx, conf, probs = _classify_sequence(
-                    model_seq, model, norm_mean, norm_std, device
-                )
+                result = classifier.classify(model_seq)
             else:
-                label, numeric_idx, conf, probs = _classify_sequence_rule_based(seq_array)
-            current_label = label
-            current_conf = conf
-            label_counts[label] += 1
+                result = _classify_sequence_rule_based(seq_array)
+
+            current_label = result.label
+            current_conf = result.confidence
+            current_entropy = result.entropy
+            current_anomaly = result.is_anomaly
+            current_metrics = metrics
+            label_counts[result.label] += 1
+            anomaly_count += int(result.is_anomaly)
             seq_idx += 1
 
             record = {
                 "sequence": seq_idx,
                 "frame_start": frame_idx - SEQ_LEN + 1,
                 "frame_end": frame_idx,
-                "label": label,
-                "label_index": numeric_idx,
-                "confidence": round(conf, 4),
+                "label": result.label,
+                "label_index": result.numeric_idx,
+                "confidence": round(result.confidence, 4),
+                "entropy_bits": result.entropy,
+                "entropy_norm": result.entropy_norm,
+                "anomaly": result.is_anomaly,
                 **metrics,
-                **(
-                    {f"p_{n}": round(probs[i].item(), 4) for i, n in enumerate(LABEL_NAMES)}
-                    if probs is not None
-                    else {}
-                ),
+                **gate_metrics,
+                **{f"p_{n}": p for n, p in result.probs.items()},
             }
             predictions.append(record)
 
-            display = DISPLAY_NAMES.get(label, label)
+            # Frame-level CSV: attach smoothed real-world coordinates (the
+            # identity-consistent, gap-interpolated tracks) + window verdict.
+            if args.frame_csv and frame_buffer:
+                players_raw, ball_raw = raw_frame_to_arrays(seq_array)
+                smooth = interpolate_gaps(recover_identity(players_raw))
+                ball_smooth = interpolate_gaps(ball_raw[:, None, :])[:, 0, :]
+                model_seq_csv = build_model_sequence(seq_array, target_len=SEQ_LEN)
+                for t, frow in enumerate(frame_buffer):
+                    for k in range(N_PLAYERS):
+                        sx, sy = smooth[t, k]
+                        frow[f"smooth_p{k+1}_x"] = round(float(sx), 1) if np.isfinite(sx) else np.nan
+                        frow[f"smooth_p{k+1}_y"] = round(float(sy), 1) if np.isfinite(sy) else np.nan
+                    bx, by = ball_smooth[t]
+                    frow["smooth_ball_x"] = round(float(bx), 1) if np.isfinite(bx) else np.nan
+                    frow["smooth_ball_y"] = round(float(by), 1) if np.isfinite(by) else np.nan
+                    for c, v in zip(MODEL_FEATURE_COLS, model_seq_csv[t]):
+                        frow[f"feat_{c}"] = round(float(v), 3)
+                    frow["sequence"] = seq_idx
+                    frow["pred_label"] = result.label
+                    frow["pred_label_index"] = result.numeric_idx
+                    frow["pred_entropy_bits"] = result.entropy
+                    frow["pred_anomaly"] = result.is_anomaly
+                frame_rows.extend(frame_buffer)
+                frame_buffer = []
+
+            display = DISPLAY_NAMES.get(result.label, result.label)
+            flag = "  [ANOMALY]" if result.is_anomaly else ""
             print(
                 f"  Seq {seq_idx:4d}  "
                 f"frames {frame_idx - SEQ_LEN + 1:5d}–{frame_idx:5d}  "
-                f"→  [{numeric_idx}] {display:<20s}  "
-                f"conf={conf:.3f}  sync={metrics['sync_score']:+.3f}  "
-                f"spacing={metrics['mean_spacing_cm']:.0f}cm"
+                f"→  [{result.numeric_idx}] {display:<22s}  "
+                f"conf={result.confidence:.3f}  H={result.entropy:.2f}b  "
+                f"sync={metrics['sync_score']:+.3f}  "
+                f"spacing={metrics['mean_spacing_cm']:.0f}cm{flag}"
             )
 
             seq_buffer.clear()
 
         # ── Annotate and write output frame ─────────────────────────────────
-        # Update ball trail with this frame's tracked position (detected or predicted)
         if tracked_ball is not None:
             ball_trail.append((int(tracked_ball[0]), int(tracked_ball[1]), ball_is_predicted))
 
         if writer is not None:
             annotated = _annotate_frame(
-                frame, tracks, tracked_ball, ball_is_predicted, ball_trail,
-                current_label, current_conf, frame_idx, fps,
+                frame, tracked_xyxy, track_ids, tracked_ball, ball_is_predicted,
+                ball_trail, current_label, current_conf, frame_idx, fps,
+                calibrator=calibrator,
+                hud_metrics=current_metrics,
+                current_entropy=current_entropy,
+                is_anomaly=current_anomaly,
+                pose_summary=pose_summary,
             )
             writer.write(annotated)
 
@@ -1032,14 +1297,30 @@ def run_pipeline(args: argparse.Namespace) -> None:
         writer.release()
         print(f"\nAnnotated video saved to '{args.output_video}'.")
 
-    # ── Save predictions CSV ─────────────────────────────────────────────────
+    # ── Save predictions CSVs ────────────────────────────────────────────────
     if predictions and args.output_csv:
         pd.DataFrame(predictions).to_csv(args.output_csv, index=False)
-        print(f"Predictions CSV saved to '{args.output_csv}'.")
+        print(f"Per-sequence predictions CSV saved to '{args.output_csv}'.")
+    if frame_rows and args.frame_csv:
+        pd.DataFrame(frame_rows).to_csv(args.frame_csv, index=False)
+        print(f"Frame-level CSV saved to '{args.frame_csv}'.")
+    if pose is not None and pose.events and args.pose_events_csv:
+        pd.DataFrame(pose.events).to_csv(args.pose_events_csv, index=False)
+        print(f"Pose events CSV saved to '{args.pose_events_csv}'.")
 
     # ── STEP 9 – Final Tactical Report ──────────────────────────────────────
     print(f"\nTotal frames processed : {frame_idx}")
     print(f"Total sequences classified : {seq_idx}")
+    print(f"Sequences flagged anomalous (conf < {args.anomaly_threshold}) : {anomaly_count}")
+    if calibrator.corners is not None:
+        print(f"Detections masked outside court : {masked_out_total}")
+    if calibrator.auto:
+        print(f"Auto court detection : {calibrator.n_auto_success} ok / "
+              f"{calibrator.n_auto_fail} kept-previous")
+    if pose is not None:
+        n_jumps = sum(1 for e in pose.events if e["event"] == "jump_takeoff")
+        n_impacts = sum(1 for e in pose.events if e["event"] == "arm_swing_impact")
+        print(f"Pose events : {n_jumps} jump take-offs, {n_impacts} arm-swing impacts")
 
     if label_counts:
         print(generate_report(dict(label_counts)))
@@ -1089,14 +1370,190 @@ def _parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--yolo-model",
-        default="yolov8n.pt",
-        help="YOLOv8 model weights (downloads automatically on first use).",
+        default="yolo11n.pt",
+        help="Detector weights. Default yolo11n.pt (auto-downloads). Pass your "
+             "fine-tuned best.pt to use the custom volleyball detector.",
+    )
+    parser.add_argument(
+        "--skip-preflight",
+        action="store_true",
+        help="Skip the pre-run population check. The check exists because every "
+             "serious failure in this project was SILENT - the pipeline printed "
+             "a complete report built on zero players. Skip only when debugging.",
+    )
+    parser.add_argument(
+        "--preflight-frames",
+        type=int,
+        default=24,
+        help="Frames sampled across the segment for the preflight check (default 24).",
+    )
+    parser.add_argument(
+        "--team-split",
+        choices=("colour", "geometric"),
+        default="colour",
+        help="How to pick which detections belong to the analysed team. "
+             "'colour' (default) clusters jersey colour and votes per track - "
+             "correct at the net, where both front rows stand within a metre of "
+             "each other. 'geometric' is the legacy foot-point-vs-net rule, "
+             "which passed 10 mixed-team players on the measured frame.",
+    )
+    parser.add_argument(
+        "--team-clusters",
+        type=int,
+        default=4,
+        help="Jersey colour clusters (default 4). More than 2 because FIVB "
+             "rules make the libero wear a contrasting jersey, so each team is "
+             "two colour populations.",
+    )
+    parser.add_argument(
+        "--team-warmup-frames",
+        type=int,
+        default=45,
+        help="Frames of geometric labelling used to teach the colour model "
+             "which cluster is which team (default 45 = 1.5 s at 30 fps).",
+    )
+    parser.add_argument(
+        "--ball-model",
+        default=None,
+        help="Separate weights used ONLY for the ball (e.g. fyp/volleyball_best.pt). "
+             "Recommended: --yolo-model yolo11n.pt --ball-model fyp/volleyball_best.pt. "
+             "Stock COCO weights are domain-robust for players but weak on the ball; "
+             "the volleyball fine-tune is the reverse. See §13 of the technical review.",
+    )
+    parser.add_argument(
+        "--ball-conf-threshold",
+        type=float,
+        default=None,
+        help="Confidence threshold for the ball model (default: min(conf-threshold, 0.15)).",
+    )
+    parser.add_argument(
+        "--imgsz",
+        type=int,
+        default=DEFAULT_IMGSZ,
+        help=f"Detector inference resolution (default {DEFAULT_IMGSZ}). The ball is "
+             "~15 px wide on a 720p frame, so the ultralytics 640 default destroys it: "
+             "measured ball recall 15%% at 640 vs 77%% at 1280 on identical weights.",
+    )
+    parser.add_argument(
+        "--person-class-id",
+        type=int,
+        default=None,
+        help="Override the person/player class id (default: auto-detect by name).",
+    )
+    parser.add_argument(
+        "--ball-class-id",
+        type=int,
+        default=None,
+        help="Override the ball class id (default: auto-detect by name; None if absent).",
     )
     parser.add_argument(
         "--conf-threshold",
         type=float,
         default=0.35,
-        help="YOLOv8 detection confidence threshold.",
+        help="Detector confidence threshold.",
+    )
+    parser.add_argument(
+        "--tracker",
+        choices=("bytetrack", "botsort"),
+        default="bytetrack",
+        help="Tracking paradigm: 'bytetrack' = IoU-only (fast); 'botsort' = "
+             "motion + camera-motion compensation + optional appearance Re-ID "
+             "(robust to dense player crossings).",
+    )
+    parser.add_argument(
+        "--kalman-q-scale",
+        type=float,
+        default=4.0,
+        help="Multiplier on the tracker's Kalman process-noise Q (measurement "
+             "noise R unchanged). >1 weights fresh detections over the "
+             "constant-velocity prediction — needed for explosive volleyball "
+             "kinetics. 1.0 = library default.",
+    )
+    parser.add_argument(
+        "--reid",
+        action="store_true",
+        help="Enable appearance Re-ID in BoT-SORT (identity survives full "
+             "occlusion overlap; costs extra compute).",
+    )
+    parser.add_argument(
+        "--pose",
+        action="store_true",
+        help="Enable 17-keypoint pose biomechanics: hip vertical velocity "
+             "(jump detection) and shoulder→wrist angular velocity (impact "
+             "detection). Adds a pose-model inference per frame.",
+    )
+    parser.add_argument(
+        "--pose-model",
+        default="yolo11n-pose.pt",
+        help="Ultralytics pose weights (17-keypoint COCO head).",
+    )
+    parser.add_argument(
+        "--pose-events-csv",
+        default="",
+        help="Path to save detected jump/impact events (requires --pose).",
+    )
+    parser.add_argument(
+        "--auto-court",
+        action="store_true",
+        help="Automatically detect the court quadrilateral every "
+             "--court-refresh frames (colour+contour segmentation with sanity "
+             "checks; a failed detection keeps the previous calibration).",
+    )
+    parser.add_argument(
+        "--court-coords",
+        choices=("homography", "linear"),
+        default="homography",
+        help="Coordinate mapping when a court quad exists. 'linear' keeps the "
+             "TRAINING feature geometry (CSVs were extracted with linear "
+             "coords) while the quad still masks out off-court people - use "
+             "this when serving a model trained on linear-coordinate CSVs.",
+    )
+    parser.add_argument(
+        "--cmc",
+        action="store_true",
+        help="Camera-motion compensation: sparse optical flow + RANSAC affine "
+             "warps the court corners each frame so the homography follows "
+             "camera pans/zooms.",
+    )
+    parser.add_argument(
+        "--court-refresh",
+        type=int,
+        default=5,
+        help="Auto court re-detection interval in frames (with --auto-court).",
+    )
+    parser.add_argument(
+        "--anomaly-threshold",
+        type=float,
+        default=0.5,
+        help="Sequences with max softmax probability below this are flagged "
+             "'Anomaly / Tactical Deviation' (high-entropy, off-template play).",
+    )
+    parser.add_argument(
+        "--gate-speed-cm",
+        type=float,
+        default=2.0,
+        help="Class-0 gate: mean player speed (cm/frame) below which a window "
+             "is routed to 'Unclassified / Transition'.",
+    )
+    parser.add_argument(
+        "--gate-min-players",
+        type=float,
+        default=3.0,
+        help="Class-0 gate: minimum mean number of visible players for a "
+             "window to be classified tactically.",
+    )
+    parser.add_argument(
+        "--no-gate",
+        action="store_true",
+        help="Disable the class-0 activity gate (every window goes to the "
+             "classifier).",
+    )
+    parser.add_argument(
+        "--frame-csv",
+        default="",
+        help="Path for the frame-level CSV: raw + smoothed real-world "
+             "coordinates, all engineered team features, predicted label and "
+             "entropy per frame (skipped if empty).",
     )
     parser.add_argument(
         "--court-corners",
