@@ -1,0 +1,112 @@
+<title>Court &amp; Ball Position Heatmaps</title>
+<style>
+  :root{ color-scheme: light; }
+  @media (prefers-color-scheme: dark){ :root:where(:not([data-theme="light"])){ color-scheme: dark; } }
+  :root[data-theme="dark"]{ color-scheme: dark; }
+
+  *{ box-sizing: border-box; }
+  body{
+    margin:0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background:#f9f9f7; color:#0b0b0b;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:where(:not([data-theme="light"])) body{ background:#0d0d0d; color:#ffffff; }
+  }
+  :root[data-theme="dark"] body{ background:#0d0d0d; color:#ffffff; }
+
+  header{ padding: 28px 24px 8px; max-width: 1180px; margin: 0 auto; }
+  header h1{ font-size: 1.5rem; margin: 0 0 6px; }
+  header p{ color:#52514e; margin:0; font-size:0.95rem; line-height:1.5; }
+  @media (prefers-color-scheme: dark){
+    :root:where(:not([data-theme="light"])) header p{ color:#c3c2b7; }
+  }
+  :root[data-theme="dark"] header p{ color:#c3c2b7; }
+
+  main{ max-width: 1180px; margin: 0 auto; padding: 8px 24px 48px; }
+
+  .video-section{ margin-top: 32px; }
+  .video-section h2{
+    font-size: 1.15rem; border-bottom: 1px solid #e1e0d9; padding-bottom: 8px; margin-bottom: 16px;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:where(:not([data-theme="light"])) .video-section h2{ border-color:#2c2c2a; }
+  }
+  :root[data-theme="dark"] .video-section h2{ border-color:#2c2c2a; }
+
+  .grid{ display:grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  @media (max-width: 900px){ .grid{ grid-template-columns: 1fr; } }
+
+  figure{
+    margin:0; background:#fcfcfb; border:1px solid rgba(11,11,11,0.10);
+    border-radius: 10px; overflow:hidden; display:flex; flex-direction:column;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:where(:not([data-theme="light"])) figure{ background:#1a1a19; border-color: rgba(255,255,255,0.10); }
+  }
+  :root[data-theme="dark"] figure{ background:#1a1a19; border-color: rgba(255,255,255,0.10); }
+
+  figure img{ width:100%; display:block; background:#fff; }
+  figcaption{ padding:10px 12px; font-size:0.82rem; color:#52514e; }
+  @media (prefers-color-scheme: dark){
+    :root:where(:not([data-theme="light"])) figcaption{ color:#c3c2b7; }
+  }
+  :root[data-theme="dark"] figcaption{ color:#c3c2b7; }
+
+  .note{
+    margin-top: 10px; font-size: 0.82rem; color:#898781; background: transparent;
+    border-left: 3px solid #eb6834; padding: 8px 12px; border-radius: 4px;
+  }
+</style>
+
+<header>
+  <h1>Court &amp; Ball Position Heatmaps</h1>
+  <p>Source: <code>videoplayback (3).mp4</code> and <code>videoplayback (4).mp4</code>, aggregated from every
+  <code>training_csv</code> tracking clip extracted from each video (all four tactical categories pooled).
+  Player/ball positions are plotted in the project's 1800&times;900&nbsp;cm court-plane coordinate system
+  (see <code>fyp/court.py</code>); missing-detection (0,0) points were dropped.</p>
+</header>
+
+<main>
+
+  <section class="video-section">
+    <h2>videoplayback (3)</h2>
+    <div class="grid">
+      <figure>
+        <img src="__V3_BASE__" alt="Base frame from videoplayback (3)">
+        <figcaption>Base frame (reference, ~12% into the video)</figcaption>
+      </figure>
+      <figure>
+        <img src="__V3_BALL__" alt="Ball position heatmap for videoplayback (3)">
+        <figcaption>Ball position heatmap - 2,534 samples</figcaption>
+      </figure>
+      <figure>
+        <img src="__V3_COURT__" alt="Player position heatmap for videoplayback (3)">
+        <figcaption>Court position heatmap (all players) - 17,656 samples</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section class="video-section">
+    <h2>videoplayback (4)</h2>
+    <div class="grid">
+      <figure>
+        <img src="__V4_BASE__" alt="Base frame from videoplayback (4)">
+        <figcaption>Base frame (reference, ~12% into the video)</figcaption>
+      </figure>
+      <figure>
+        <img src="__V4_BALL__" alt="Ball position heatmap for videoplayback (4)">
+        <figcaption>Ball position heatmap - 521 samples</figcaption>
+      </figure>
+      <figure>
+        <img src="__V4_COURT__" alt="Player position heatmap for videoplayback (4)">
+        <figcaption>Court position heatmap (all players) - 8,057 samples</figcaption>
+      </figure>
+    </div>
+    <p class="note">Note: in videoplayback (4) the ball heatmap sits on the opposite side of the net (y&lt;450)
+    from the player heatmap (y&gt;450), unlike videoplayback (3) where both align on the same side. This points
+    to a per-video court-calibration/orientation difference in the source tracking data, not an error in this
+    aggregation - worth checking against that video's homography corners if you need the two heatmaps
+    spatially consistent.</p>
+  </section>
+
+</main>
