@@ -83,34 +83,68 @@ plt.rcParams["font.sans-serif"] = ["Segoe UI", "DejaVu Sans", "Arial"]
 # ---------------------------------------------------------------------------
 def load_positions(video_tag: str) -> tuple[np.ndarray, np.ndarray]:
     """Return (ball_xy, player_xy) arrays pooled from every training_csv clip
-    that was extracted from *video_tag* (e.g. 'videoplayback (3)')."""
+    extracted from *video_tag* (e.g. 'videoplayback (3)') that PASSES a
+    per-clip self-consistency check.
+
+    "Our team" = the camera-near side (team_side="bottom" at extraction time).
+    The player columns (p1..p6) are already hard-filtered to that side - but
+    that filter is tautological: it can't tell a correct near/far calibration
+    from an inverted one, it just keeps whatever the homography called "near"
+    for that clip. The ball has no such filter, so it's the only honest cross
+    check available. A clip is kept only if the ball's mean court-Y and the
+    kept players' mean court-Y land on the SAME side of the net - i.e. the
+    ball corroborates that the "near" call for that clip was actually near.
+    Clips where they disagree are dropped rather than guessed at, since we
+    cannot tell from the data alone whether the ball or the players (or
+    neither) were mapped correctly.
+    """
     pattern = os.path.join(CSV_DIR, f"*{video_tag}*_clip_*.csv")
     files = sorted(glob.glob(pattern))
     if not files:
         raise FileNotFoundError(f"No clip CSVs found for {video_tag!r} in {CSV_DIR}")
 
-    frames = [pd.read_csv(f) for f in files]
-    df = pd.concat(frames, ignore_index=True)
-
-    # Ball: drop the (0,0) missing-detection sentinel, then clip obvious
-    # homography-noise outliers (airborne ball frames) to a generous margin
-    # around the nominal court plane.
-    bx, by = df["ball_x"].to_numpy(), df["ball_y"].to_numpy()
-    ball_mask = ~((bx == 0) & (by == 0))
-    bx, by = bx[ball_mask], by[ball_mask]
     margin_x, margin_y = COURT_W_CM * 0.5, COURT_H_CM * 0.5
-    bounds = (
-        (bx >= -margin_x) & (bx <= COURT_W_CM + margin_x)
-        & (by >= -margin_y) & (by <= COURT_H_CM + margin_y)
+    kept_ball, kept_player = [], []
+    n_kept = n_inconsistent = n_sparse = 0
+
+    for f in files:
+        df = pd.read_csv(f)
+
+        bx, by = df["ball_x"].to_numpy(), df["ball_y"].to_numpy()
+        bmask = ~((bx == 0) & (by == 0))
+
+        px = df.filter(regex=r"^p[1-6]_x$").to_numpy().ravel()
+        py = df.filter(regex=r"^p[1-6]_y$").to_numpy().ravel()
+        pmask = ~((px == 0) & (py == 0))
+
+        if bmask.sum() < 3 or pmask.sum() < 3:
+            n_sparse += 1  # too few real detections to judge this clip at all
+            continue
+
+        ball_mean_y = by[bmask].mean()
+        player_mean_y = py[pmask].mean()
+        same_side = (ball_mean_y - NET_Y_CM) * (player_mean_y - NET_Y_CM) > 0
+        if not same_side:
+            n_inconsistent += 1  # ball disagrees with the "near" call - drop
+            continue
+
+        bx_c, by_c = bx[bmask], by[bmask]
+        bounds = (
+            (bx_c >= -margin_x) & (bx_c <= COURT_W_CM + margin_x)
+            & (by_c >= -margin_y) & (by_c <= COURT_H_CM + margin_y)
+        )
+        kept_ball.append(np.column_stack([bx_c[bounds], by_c[bounds]]))
+        kept_player.append(np.column_stack([px[pmask], py[pmask]]))
+        n_kept += 1
+
+    ball_xy = np.concatenate(kept_ball) if kept_ball else np.empty((0, 2))
+    player_xy = np.concatenate(kept_player) if kept_player else np.empty((0, 2))
+
+    print(
+        f"  clips: {len(files)} total -> {n_kept} kept, "
+        f"{n_inconsistent} dropped (ball/player disagree on net side), "
+        f"{n_sparse} dropped (too few detections to judge)"
     )
-    ball_xy = np.column_stack([bx[bounds], by[bounds]])
-
-    # Players: pool p1..p6, drop the (0,0) missing/occluded sentinel.
-    px = df.filter(regex=r"^p[1-6]_x$").to_numpy().ravel()
-    py = df.filter(regex=r"^p[1-6]_y$").to_numpy().ravel()
-    pmask = ~((px == 0) & (py == 0))
-    player_xy = np.column_stack([px[pmask], py[pmask]])
-
     return ball_xy, player_xy
 
 
@@ -207,13 +241,13 @@ def main() -> None:
         render_heatmap(
             ball_xy, BLUE_CMAP,
             title=f"Ball Position Heatmap - {tag}",
-            subtitle=f"{len(ball_xy)} tracked ball positions pooled across all labelled clips",
+            subtitle=f"{len(ball_xy)} ball positions - camera-near team only, self-consistent clips",
             out_path=os.path.join(OUT_DIR, f"{safe}_ball_heatmap.png"),
         )
         render_heatmap(
             player_xy, ORANGE_CMAP,
-            title=f"Court Position Heatmap (All Players) - {tag}",
-            subtitle=f"{len(player_xy)} tracked player positions (p1-p6) pooled across all labelled clips",
+            title=f"Court Position Heatmap (Camera-Near Team) - {tag}",
+            subtitle=f"{len(player_xy)} player positions (p1-p6) - self-consistent clips only",
             out_path=os.path.join(OUT_DIR, f"{safe}_court_heatmap.png"),
         )
 
