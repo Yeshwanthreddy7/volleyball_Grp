@@ -404,6 +404,7 @@ def _filter_players_by_team_side(
         return person_xyxy, person_conf
 
     keep_indices: list[int] = []
+    depths: list[float] = []   # signed distance past the margin, for the top-6 cap below
     for i, (x1, y1, x2, y2) in enumerate(person_xyxy):
         px = float((x1 + x2) / 2.0)
         py = float(y2)                       # foot point, not centroid
@@ -411,11 +412,25 @@ def _filter_players_by_team_side(
 
         if team_side == "bottom":
             on_side = court_y >= (NET_Y_CM + net_margin_cm)
+            depth = court_y                  # larger = deeper into our own court
         else:  # team_side == "top"
             on_side = court_y <= (NET_Y_CM - net_margin_cm)
+            depth = -court_y
 
         if on_side:
             keep_indices.append(i)
+            depths.append(depth)
+
+    # A team is exactly 6 players. Blockers from BOTH sides legitimately play
+    # within a similar close range of the net, so a fixed margin alone can
+    # let a few far-side blockers clear the threshold too (verified: their
+    # computed depth sits only marginally past the margin, never as deep as
+    # genuine near-side players). Rather than widen the margin - which just
+    # shifts, not solves, that ambiguity - cap to the 6 detections deepest
+    # into OUR side; a genuine leak is reliably the shallowest of the bunch.
+    if len(keep_indices) > N_PLAYERS:
+        order = np.argsort(depths)[::-1][:N_PLAYERS]
+        keep_indices = [keep_indices[i] for i in order]
 
     if not keep_indices:
         global _SIDE_FILTER_WARNED
@@ -1153,6 +1168,20 @@ def run_pipeline(args: argparse.Namespace) -> None:
                 keep = np.ones(len(tracked_xyxy), dtype=bool)
             else:
                 keep = voted == want
+                # Same real-world constraint as the geometric path (see
+                # _filter_players_by_team_side): a team is exactly N_PLAYERS.
+                # Near-net colour/vote mis-labels can let a few of the other
+                # side's front row through too; cap to the N_PLAYERS voted
+                # "want" that sit deepest into OUR half - a genuine leak is
+                # reliably the shallowest of the bunch, never the deepest.
+                n_kept = int(keep.sum())
+                if n_kept > N_PLAYERS:
+                    kept_idx = np.flatnonzero(keep)
+                    sign = 1.0 if args.team_side == "bottom" else -1.0
+                    depths = np.array([sign * court_ys[i] for i in kept_idx])
+                    top = kept_idx[np.argsort(depths)[::-1][:N_PLAYERS]]
+                    keep = np.zeros(len(tracked_xyxy), dtype=bool)
+                    keep[top] = True
             tracked_xyxy = tracked_xyxy[keep]
             track_ids = track_ids[keep]
 
