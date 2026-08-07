@@ -978,6 +978,7 @@ def run_pipeline(args: argparse.Namespace) -> None:
         cmc=args.cmc,
         refresh_every=args.court_refresh,
         force_linear=(args.court_coords == "linear"),
+        manual_half=args.court_corners_half,
     )
     if args.court_corners:
         print("Court homography computed from supplied corner points"
@@ -1080,6 +1081,7 @@ def run_pipeline(args: argparse.Namespace) -> None:
             cmc=args.cmc,
             refresh_every=args.court_refresh,
             force_linear=(args.court_coords == "linear"),
+            manual_half=args.court_corners_half,
         )
 
     print("\nProcessing frames…")
@@ -1565,6 +1567,18 @@ def _parse_args() -> argparse.Namespace:
             "Four pixel coordinates (x,y) of the court boundary corners "
             "in TL→TR→BR→BL order, for perspective homography. "
             "Example: --court-corners 42,18 1238,18 1238,702 42,702"
+        ),
+    )
+    parser.add_argument(
+        "--court-corners-half",
+        action="store_true",
+        help=(
+            "Treat --court-corners as the NEAR HALF only (net -> near "
+            "baseline), the same convention --auto-court uses, instead of "
+            "the full court (far baseline -> near baseline). Use this when "
+            "the far baseline isn't reliably visible/measurable from the "
+            "source camera angle. Getting this flag wrong silently shifts "
+            "the net-line reference and can flip which team 'near' means."
         ),
     )
     parser.add_argument(

@@ -219,6 +219,7 @@ class CourtCalibrator:
         refresh_every: int = 5,
         mask_margin_px: float = 12.0,
         force_linear: bool = False,
+        manual_half: bool = False,
     ) -> None:
         # force_linear: use the detected quad ONLY as an in/out-of-court MASK
         # (drop coaches/refs/bench) while coordinates stay on the linear
@@ -237,11 +238,19 @@ class CourtCalibrator:
             order_corners(np.asarray(manual_corners, dtype=np.float32))
             if manual_corners is not None else None
         )
-        # Manual corners describe the FULL court; auto-detected quads describe
-        # the NEAR half (see build_homography docstring).
-        self._dst: np.ndarray | None = None if manual_corners is not None else _HALF_DST
+        # Manual corners normally describe the FULL court; auto-detected quads
+        # describe the NEAR half (see build_homography docstring). Pass
+        # manual_half=True when the 4 manual points ALSO only span the near
+        # half (net -> near baseline) - e.g. because the far baseline isn't
+        # reliably visible from this camera angle - so they get the same
+        # _HALF_DST mapping an auto-detected quad would. Getting this wrong
+        # silently shifts the internal net-line reference and can flip which
+        # team gets treated as "near".
+        self._dst: np.ndarray | None = (
+            _HALF_DST if (manual_corners is None or manual_half) else None
+        )
         self.H: np.ndarray | None = (
-            build_homography(self.corners) if self.corners is not None else None
+            build_homography(self.corners, dst=self._dst) if self.corners is not None else None
         )
         self._cme = CameraMotionEstimator() if cmc else None
         self._frame_idx = 0

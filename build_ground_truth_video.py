@@ -162,6 +162,10 @@ def main() -> None:
     ap.add_argument("--output", required=True, help="Path for the annotated output video.")
     ap.add_argument("--crf", type=int, default=20, help="libx264 quality (lower = better/larger, default 20).")
     ap.add_argument("--preset", default="veryfast", help="libx264 speed preset (default veryfast).")
+    ap.add_argument("--end", default=None,
+                     help="Stop the output at this timestamp (HH:MM:SS), instead of "
+                          "encoding the whole source video. Handy when the labelled "
+                          "events only span the opening minutes of a long match.")
     args = ap.parse_args()
 
     video_file = args.video_file or os.path.basename(args.video)
@@ -185,15 +189,18 @@ def main() -> None:
     ffmpeg_exe = _resolve_ffmpeg()
 
     os.makedirs(os.path.dirname(os.path.abspath(args.output)) or ".", exist_ok=True)
-    cmd = [
-        ffmpeg_exe, "-y", "-i", args.video,
+    cmd = [ffmpeg_exe, "-y", "-i", args.video]
+    if args.end:
+        cmd += ["-to", args.end]
+    cmd += [
         "-vf", vf,
         "-c:v", "libx264", "-preset", args.preset, "-crf", str(args.crf),
         "-c:a", "copy",
         "-movflags", "+faststart",
         args.output,
     ]
-    print("\nRunning ffmpeg (this re-encodes the full video - it will take a while)...")
+    span = f"the first {args.end}" if args.end else "the full video"
+    print(f"\nRunning ffmpeg (re-encodes {span} - this will take a while)...")
     result = subprocess.run(cmd)
     if result.returncode != 0:
         raise SystemExit(f"[ERROR] ffmpeg exited with code {result.returncode}")
