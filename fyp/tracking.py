@@ -359,13 +359,18 @@ def create_tracker(
     fps: float = 30.0,
     q_scale: float = 4.0,
     with_reid: bool = False,
+    track_buffer: int = 30,
+    appearance_thresh: float = 0.25,
 ) -> BaseTrackerAdapter:
     """Instantiate a tracker backend by name; falls back to ByteTrack with a
     warning if the requested backend cannot be constructed."""
     tracker_type = tracker_type.lower()
     if tracker_type == "botsort":
         try:
-            return BoTSORTAdapter(fps=fps, q_scale=q_scale, with_reid=with_reid)
+            return BoTSORTAdapter(
+                fps=fps, q_scale=q_scale, with_reid=with_reid,
+                track_buffer=track_buffer, appearance_thresh=appearance_thresh,
+            )
         except Exception as exc:
             print(
                 f"[WARNING] BoT-SORT unavailable ({exc}); falling back to "

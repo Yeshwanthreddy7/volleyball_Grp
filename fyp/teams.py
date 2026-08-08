@@ -273,9 +273,22 @@ class TeamVoter:
     ids after a track dies) cannot be dominated forever by its previous owner.
     """
 
-    def __init__(self, decay: float = 0.98, min_votes: float = 0.0) -> None:
+    def __init__(
+        self, decay: float = 0.98, min_votes: float = 0.0, min_ratio: float = 1.0,
+    ) -> None:
         self.decay = float(decay)
         self.min_votes = float(min_votes)
+        # min_ratio: how much the winning side must outweigh the other before
+        # the vote commits to NEAR/FAR. 1.0 = bare majority (any lead wins,
+        # the historical default - a single frame can flip/decide a track
+        # from its very first sample, which doesn't actually deliver the "N-1
+        # good frames outvote 1 bad frame" protection this class is meant to
+        # provide). >1.0 requires a decisive lead; an ambiguous/close track
+        # returns UNKNOWN instead of guessing - callers filtering by team
+        # membership (`voted == want`) then naturally exclude it, which is
+        # the right default when a false "keep" (e.g. boxing an opponent) is
+        # worse than a false "drop" (missing a genuine teammate for a frame).
+        self.min_ratio = float(min_ratio)
         self._votes: dict[int, list[float]] = {}   # id -> [near, far]
 
     def update(self, track_ids, labels) -> np.ndarray:
@@ -297,9 +310,15 @@ class TeamVoter:
                 slot[1] += 1.0
             near, far = slot
             if max(near, far) < self.min_votes:
-                out[i] = int(lab)
+                # Too little history for this track to trust yet - excluded
+                # rather than decided off a single (possibly wrong) reading.
+                out[i] = UNKNOWN
+            elif near > far * self.min_ratio:
+                out[i] = NEAR
+            elif far > near * self.min_ratio:
+                out[i] = FAR
             else:
-                out[i] = NEAR if near >= far else FAR
+                out[i] = UNKNOWN
         return out
 
     def forget(self, keep_ids) -> None:

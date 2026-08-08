@@ -461,7 +461,7 @@ def _extract_positions(
     ball_center: np.ndarray | None,
     calibrator: CourtCalibrator,
     slot_map: "dict[int, int] | SlotManager",
-) -> tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, dict[int, int]]:
     """
     Convert ByteTrack detections to court coordinates with a STABLE, identity-
     consistent slot assignment.
@@ -490,6 +490,10 @@ def _extract_positions(
     -------
     player_positions : (6, 2) court-cm coords; NaN rows for empty slots.
     ball_pos         : (2,) court-cm coords; NaN if ball unknown.
+    id_to_slot       : {tracker_id: slot 0-5} for every currently-live id -
+                        the stable, non-swapping identity used for on-screen
+                        "P{n}" labels (1-6), never the tracker's raw
+                        ever-growing internal id.
     """
     # Foot point (bottom-centre) per active track ID, in court cm.
     court_feet: dict[int, tuple[float, float]] = {}
@@ -534,7 +538,7 @@ def _extract_positions(
     else:
         ball_pos = np.array([np.nan, np.nan], dtype=float)
 
-    return player_positions, ball_pos
+    return player_positions, ball_pos, id_to_slot
 
 
 # ---------------------------------------------------------------------------
@@ -687,6 +691,7 @@ def _annotate_frame(
     current_entropy: float = 0.0,
     is_anomaly: bool = False,
     pose_summary: "PoseFrameSummary | None" = None,
+    display_ids: np.ndarray | None = None,
 ) -> np.ndarray:
     """
     Draw tracking boxes, ball trail + marker, frame info, and current label.
@@ -755,10 +760,14 @@ def _annotate_frame(
     # ── Player bounding boxes (colour reflects current tactical label) ─────────
     if len(tracked_xyxy) > 0:
         pose_tracks = pose_summary.per_track if pose_summary else {}
-        for tid, (x1, y1, x2, y2) in zip(track_ids, tracked_xyxy):
+        # Stable 1-6 slot id for the on-screen tag when supplied (identity.
+        # SlotManager - never swaps, never grows past the team size); the raw
+        # tracker id is still used for internal lookups (e.g. pose) below.
+        labels_for_boxes = display_ids if display_ids is not None else track_ids
+        for tid, disp_id, (x1, y1, x2, y2) in zip(track_ids, labels_for_boxes, tracked_xyxy):
             x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
             cv2.rectangle(out, (x1, y1), (x2, y2), box_color, 2)
-            tag = f"P {tid}"
+            tag = f"P {disp_id}"
             info = pose_tracks.get(int(tid))
             if info is not None and info.get("airborne"):
                 tag += f"  JUMP {info['vy_ms']:.1f} m/s"
@@ -981,7 +990,8 @@ def run_pipeline(args: argparse.Namespace) -> None:
 
     # ── Tracker (paradigm switch + Kalman tuning, spec §2) ──────────────────
     tracker = create_tracker(
-        args.tracker, fps=fps, q_scale=args.kalman_q_scale, with_reid=args.reid
+        args.tracker, fps=fps, q_scale=args.kalman_q_scale, with_reid=args.reid,
+        track_buffer=args.track_buffer, appearance_thresh=args.appearance_thresh,
     )
     print(f"Tracker : {tracker.name}")
 
@@ -1036,12 +1046,14 @@ def run_pipeline(args: argparse.Namespace) -> None:
     # ── State variables ──────────────────────────────────────────────────────
     seq_buffer: list[np.ndarray] = []   # accumulates (14,) raw rows → 29 frames
     frame_buffer: list[dict] = []       # per-frame records of current window
-    slot_map = SlotManager()            # persistent slots + occlusion bridge (L1 fix)
+    slot_map = SlotManager(         # persistent slots + occlusion bridge (L1 fix)
+        max_gap=args.slot_max_gap, gate_cap_cm=args.slot_gate_cap_cm,
+    )
     ball_tracker = BallTracker()        # constant-velocity ball tracker
     # Jersey-colour team separation. Disabled for --team-side all (nothing to
     # separate) and in explicit --team-split geometric mode.
     team_clf: TeamClassifier | None = None
-    team_voter = TeamVoter()
+    team_voter = TeamVoter(min_votes=args.team_vote_min_votes, min_ratio=args.team_vote_min_ratio)
     if args.team_split == "colour" and args.team_side != "all":
         team_clf = TeamClassifier(
             n_clusters=args.team_clusters,
@@ -1167,7 +1179,20 @@ def run_pipeline(args: argparse.Namespace) -> None:
             if args.team_side == "all":
                 keep = np.ones(len(tracked_xyxy), dtype=bool)
             else:
-                keep = voted == want
+                # Require BOTH the historical colour vote AND the CURRENT
+                # frame's own geometric position to agree. Colour alone can
+                # be fooled by lighting/occlusion at the net; geometry alone
+                # can be fooled by a blocker's momentary reach. Requiring
+                # both is strictly more conservative than either - it trades
+                # occasionally dropping a genuine near-side player mid-block
+                # for reliably never keeping an opponent, which is the
+                # priority here (see --team-side docs).
+                court_ys_arr = np.asarray(court_ys, dtype=float)
+                sign0 = 1.0 if args.team_side == "bottom" else -1.0
+                geometric_ok = (sign0 * court_ys_arr) >= (
+                    sign0 * NET_Y_CM + args.net_margin_cm
+                )
+                keep = (voted == want) & geometric_ok
                 # Same real-world constraint as the geometric path (see
                 # _filter_players_by_team_side): a team is exactly N_PLAYERS.
                 # Near-net colour/vote mis-labels can let a few of the other
@@ -1194,8 +1219,17 @@ def run_pipeline(args: argparse.Namespace) -> None:
             pose_summary = pose.process(frame, tracked_xyxy, track_ids)
 
         # ── STEP 5 – Position extraction + feature engineering ──────────────
-        player_positions, ball_pos = _extract_positions(
+        player_positions, ball_pos, id_to_slot = _extract_positions(
             tracked_xyxy, track_ids, tracked_ball, calibrator, slot_map
+        )
+        # Stable 1-6 display id per currently-tracked box (slot + 1). Falls
+        # back to the raw tracker id only if the court was already full and
+        # this id genuinely couldn't get a slot (shouldn't happen now that
+        # team-side filtering caps at N_PLAYERS before this point).
+        display_ids = np.array(
+            [(id_to_slot[int(t)] + 1) if int(t) in id_to_slot else int(t)
+             for t in track_ids],
+            dtype=int,
         )
         feature_row = _compute_frame_features(player_positions, ball_pos)
         seq_buffer.append(feature_row)
@@ -1316,6 +1350,7 @@ def run_pipeline(args: argparse.Namespace) -> None:
                 current_entropy=current_entropy,
                 is_anomaly=current_anomaly,
                 pose_summary=pose_summary,
+                display_ids=display_ids,
             )
             writer.write(annotated)
 
@@ -1507,6 +1542,26 @@ def _parse_args() -> argparse.Namespace:
              "occlusion overlap; costs extra compute).",
     )
     parser.add_argument(
+        "--track-buffer",
+        type=int,
+        default=30,
+        help="BoT-SORT: frames (at a nominal 30fps) a lost track stays "
+             "eligible for ReID re-matching before being expired for good "
+             "(ultralytics default 30 - a net scramble easily occludes a "
+             "player longer than that; verified via direct tracing on this "
+             "footage that a real physical player's raw track id was lost "
+             "and never reclaimed at the default. Try 90+ if renumbering "
+             "persists).",
+    )
+    parser.add_argument(
+        "--appearance-thresh",
+        type=float,
+        default=0.25,
+        help="BoT-SORT+ReID: max appearance-embedding distance accepted "
+             "when re-matching a lost track (ultralytics default 0.25, "
+             "lower = stricter). Only relevant with --reid.",
+    )
+    parser.add_argument(
         "--pose",
         action="store_true",
         help="Enable 17-keypoint pose biomechanics: hip vertical velocity "
@@ -1619,6 +1674,49 @@ def _parse_args() -> argparse.Namespace:
             "classification features. Use 'bottom' for players before the net "
             "(near-camera side in common broadcast view)."
         ),
+    )
+    parser.add_argument(
+        "--slot-max-gap",
+        type=int,
+        default=90,
+        help="Frames a display-id slot (identity.SlotManager) is held in "
+             "limbo after its track disappears before it's freed for reuse "
+             "(default 90 = 1.8s @ 50fps, up from the module default 15 = "
+             "0.3s - a net scramble easily occludes a player longer than "
+             "0.3s; the short default let a still-on-court player's slot "
+             "expire and get renumbered on reappearance).",
+    )
+    parser.add_argument(
+        "--slot-gate-cap-cm",
+        type=float,
+        default=250.0,
+        help="Max court-distance (cm) a slot's re-acquisition after "
+             "occlusion will bridge across, regardless of gap length "
+             "(identity.SlotManager default 250). A player diving/jumping "
+             "during a scramble can cover more than this in under a second, "
+             "which forces a fresh slot on reappearance even with a wide "
+             "--slot-max-gap - raise this too if renumbering persists.",
+    )
+    parser.add_argument(
+        "--team-vote-min-votes",
+        type=float,
+        default=0.0,
+        help="Per-track colour-vote sample count required before the vote "
+             "overrides the raw current-frame label (default 0 = original "
+             "behaviour). Raising this only helps when leaks are occasional/"
+             "noisy; tested on this footage it did NOT reduce a leak caused "
+             "by a consistently-wrong colour read (kit colours ambiguous "
+             "under net lighting) - see teams.TeamVoter.",
+    )
+    parser.add_argument(
+        "--team-vote-min-ratio",
+        type=float,
+        default=1.0,
+        help="How decisively the winning side must outweigh the other in a "
+             "track's colour vote before committing to NEAR/FAR (default "
+             "1.0 = bare majority, original behaviour). Below this the vote "
+             "is UNKNOWN and the track is excluded rather than guessed - "
+             "see teams.TeamVoter and --team-vote-min-votes' caveat.",
     )
     parser.add_argument(
         "--net-margin-cm",

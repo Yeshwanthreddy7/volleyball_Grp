@@ -10,9 +10,9 @@ Opening video: dataset/videoplayback (3).mp4
 [tracking] BoT-SORT: Kalman process noise Q scaled x4 (measurement noise R unchanged).
 Tracker : botsort (motion+appearance, GMC sparseOptFlow, ReID on, ultralytics)
 Court homography computed from supplied corner points.
-Team-side filter: BOTTOM side of net (net margin: 30.0 cm)
+Team-side filter: BOTTOM side of net (net margin: 60.0 cm)
 Class-0 gate: mean speed < 2.0 cm/frame or < 3 players visible -> Unclassified
-  Output video: heatmaps/_stage_a_boxes_10min.mp4
+  Output video: heatmaps/_stage_a_v2_10min.mp4
 Team split: jersey colour (4 clusters, 45-frame warm-up, per-track vote)
 
 Preflight check
@@ -80,7 +80,7 @@ Processing frames…
   Seq   50  frames  1422– 1450  →  [3] DELAYED SUPPORT         conf=1.000  H=0.00b  sync=-0.040  spacing=138cm
   Seq   51  frames  1451– 1479  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=-0.071  spacing=192cm
   … 1500/90451 frames (2%)
-  Seq   52  frames  1480– 1508  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=+0.044  spacing=180cm
+  Seq   52  frames  1480– 1508  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=+0.034  spacing=179cm
   Seq   53  frames  1509– 1537  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=-0.013  spacing=166cm
   Seq   54  frames  1538– 1566  →  [3] DELAYED SUPPORT         conf=1.000  H=0.00b  sync=+0.037  spacing=157cm
   Seq   55  frames  1567– 1595  →  [0] TRANSITION / DEAD BALL  conf=1.000  H=0.00b  sync=+0.021  spacing=194cm
@@ -252,7 +252,7 @@ Processing frames…
   … 6000/90451 frames (7%)
   Seq  207  frames  5975– 6003  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.122  spacing=111cm
   Seq  208  frames  6004– 6032  →  [3] DELAYED SUPPORT         conf=1.000  H=0.00b  sync=+0.023  spacing=174cm
-  Seq  209  frames  6033– 6061  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=+0.031  spacing=231cm
+  Seq  209  frames  6033– 6061  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=-0.000  spacing=218cm
   Seq  210  frames  6062– 6090  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=-0.025  spacing=162cm
   Seq  211  frames  6091– 6119  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=-0.036  spacing=212cm
   Seq  212  frames  6120– 6148  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=-0.077  spacing=210cm
@@ -308,8 +308,8 @@ Processing frames…
   Seq  258  frames  7454– 7482  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.287  spacing=128cm
   … 7500/90451 frames (8%)
   Seq  259  frames  7483– 7511  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=-0.009  spacing=115cm
-  Seq  260  frames  7512– 7540  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=-0.018  spacing=158cm
-  Seq  261  frames  7541– 7569  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=-0.066  spacing=204cm
+  Seq  260  frames  7512– 7540  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=+0.038  spacing=165cm
+  Seq  261  frames  7541– 7569  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=-0.077  spacing=233cm
   Seq  262  frames  7570– 7598  →  [0] TRANSITION / DEAD BALL  conf=1.000  H=0.00b  sync=+0.035  spacing=170cm
   Seq  263  frames  7599– 7627  →  [4] SPACING BREAKDOWN       conf=1.000  H=0.00b  sync=+0.103  spacing=163cm
   Seq  264  frames  7628– 7656  →  [0] TRANSITION / DEAD BALL  conf=1.000  H=0.00b  sync=+0.367  spacing=156cm
@@ -471,11 +471,11 @@ Processing frames…
   Seq  406  frames 11746–11774  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=+0.143  spacing=184cm
   Seq  407  frames 11775–11803  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.061  spacing=231cm
   Seq  408  frames 11804–11832  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=+0.046  spacing=211cm
-  Seq  409  frames 11833–11861  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=-0.020  spacing=198cm
-  Seq  410  frames 11862–11890  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.015  spacing=143cm
-  Seq  411  frames 11891–11919  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=-0.025  spacing=192cm
+  Seq  409  frames 11833–11861  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=-0.060  spacing=194cm
+  Seq  410  frames 11862–11890  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=-0.017  spacing=197cm
+  Seq  411  frames 11891–11919  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=-0.020  spacing=208cm
   Seq  412  frames 11920–11948  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.002  spacing=248cm
-  Seq  413  frames 11949–11977  →  [3] DELAYED SUPPORT         conf=1.000  H=0.00b  sync=+0.048  spacing=202cm
+  Seq  413  frames 11949–11977  →  [4] SPACING BREAKDOWN       conf=1.000  H=0.00b  sync=+0.079  spacing=253cm
   … 12000/90451 frames (13%)
   Seq  414  frames 11978–12006  →  [0] TRANSITION / DEAD BALL  conf=1.000  H=0.00b  sync=+0.315  spacing=211cm
   Seq  415  frames 12007–12035  →  [0] TRANSITION / DEAD BALL  conf=1.000  H=0.00b  sync=+0.198  spacing=207cm
@@ -509,9 +509,9 @@ Processing frames…
   Seq  441  frames 12761–12789  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=-0.010  spacing=141cm
   Seq  442  frames 12790–12818  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=+0.105  spacing=168cm
   Seq  443  frames 12819–12847  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.051  spacing=152cm
-  Seq  444  frames 12848–12876  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=-0.015  spacing=149cm
+  Seq  444  frames 12848–12876  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=-0.017  spacing=144cm
   … 12900/90451 frames (14%)
-  Seq  445  frames 12877–12905  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=-0.030  spacing=164cm
+  Seq  445  frames 12877–12905  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=-0.042  spacing=158cm
   Seq  446  frames 12906–12934  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=+0.158  spacing=192cm
   Seq  447  frames 12935–12963  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=+0.195  spacing=234cm
   Seq  448  frames 12964–12992  →  [0] TRANSITION / DEAD BALL  conf=1.000  H=0.00b  sync=+0.320  spacing=240cm
@@ -642,9 +642,9 @@ Processing frames…
   Seq  562  frames 16270–16298  →  [0] TRANSITION / DEAD BALL  conf=1.000  H=0.00b  sync=-0.017  spacing=158cm
   Seq  563  frames 16299–16327  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.077  spacing=135cm
   Seq  564  frames 16328–16356  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=-0.051  spacing=123cm
-  Seq  565  frames 16357–16385  →  [3] DELAYED SUPPORT         conf=1.000  H=0.00b  sync=+0.112  spacing=113cm
-  Seq  566  frames 16386–16414  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=+0.020  spacing=134cm
-  Seq  567  frames 16415–16443  →  [3] DELAYED SUPPORT         conf=1.000  H=0.00b  sync=+0.104  spacing=142cm
+  Seq  565  frames 16357–16385  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=+0.118  spacing=112cm
+  Seq  566  frames 16386–16414  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=+0.014  spacing=132cm
+  Seq  567  frames 16415–16443  →  [0] TRANSITION / DEAD BALL  conf=1.000  H=0.00b  sync=+0.069  spacing=135cm
   Seq  568  frames 16444–16472  →  [3] DELAYED SUPPORT         conf=1.000  H=0.00b  sync=-0.038  spacing=188cm
   … 16500/90451 frames (18%)
   Seq  569  frames 16473–16501  →  [0] TRANSITION / DEAD BALL  conf=1.000  H=0.00b  sync=+0.145  spacing=197cm
@@ -680,12 +680,12 @@ Processing frames…
   Seq  597  frames 17285–17313  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.023  spacing=188cm
   Seq  598  frames 17314–17342  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=-0.052  spacing=168cm
   Seq  599  frames 17343–17371  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=-0.076  spacing=113cm
-  Seq  600  frames 17372–17400  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=-0.034  spacing=122cm
+  Seq  600  frames 17372–17400  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=-0.040  spacing=121cm
   … 17400/90451 frames (19%)
-  Seq  601  frames 17401–17429  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=+0.071  spacing=132cm
-  Seq  602  frames 17430–17458  →  [3] DELAYED SUPPORT         conf=1.000  H=0.00b  sync=+0.240  spacing=215cm
-  Seq  603  frames 17459–17487  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.060  spacing=241cm
-  Seq  604  frames 17488–17516  →  [4] SPACING BREAKDOWN       conf=1.000  H=0.00b  sync=+0.437  spacing=150cm
+  Seq  601  frames 17401–17429  →  [0] TRANSITION / DEAD BALL  conf=1.000  H=0.00b  sync=+0.062  spacing=142cm
+  Seq  602  frames 17430–17458  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.240  spacing=216cm
+  Seq  603  frames 17459–17487  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.049  spacing=247cm
+  Seq  604  frames 17488–17516  →  [4] SPACING BREAKDOWN       conf=1.000  H=0.00b  sync=+0.406  spacing=148cm
   Seq  605  frames 17517–17545  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.264  spacing=106cm
   Seq  606  frames 17546–17574  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.202  spacing=123cm
   Seq  607  frames 17575–17603  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.150  spacing=131cm
@@ -717,8 +717,8 @@ Processing frames…
   Seq  631  frames 18271–18299  →  [4] SPACING BREAKDOWN       conf=1.000  H=0.00b  sync=+0.050  spacing=284cm
   … 18300/90451 frames (20%)
   Seq  632  frames 18300–18328  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=-0.072  spacing=249cm
-  Seq  633  frames 18329–18357  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=+0.129  spacing=223cm
-  Seq  634  frames 18358–18386  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=+0.088  spacing=176cm
+  Seq  633  frames 18329–18357  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=+0.120  spacing=219cm
+  Seq  634  frames 18358–18386  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=+0.091  spacing=179cm
   Seq  635  frames 18387–18415  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.010  spacing=166cm
   Seq  636  frames 18416–18444  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=-0.025  spacing=179cm
   Seq  637  frames 18445–18473  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=-0.013  spacing=204cm
@@ -758,7 +758,7 @@ Processing frames…
   Seq  668  frames 19344–19372  →  [3] DELAYED SUPPORT         conf=1.000  H=0.00b  sync=-0.120  spacing=272cm
   Seq  669  frames 19373–19401  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=-0.060  spacing=242cm
   Seq  670  frames 19402–19430  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=+0.097  spacing=284cm
-  Seq  671  frames 19431–19459  →  [4] SPACING BREAKDOWN       conf=1.000  H=0.00b  sync=-0.141  spacing=248cm
+  Seq  671  frames 19431–19459  →  [4] SPACING BREAKDOWN       conf=1.000  H=0.00b  sync=-0.123  spacing=248cm
   Seq  672  frames 19460–19488  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=-0.029  spacing=236cm
   … 19500/90451 frames (22%)
   Seq  673  frames 19489–19517  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.020  spacing=269cm
@@ -776,7 +776,7 @@ Processing frames…
   Seq  684  frames 19808–19836  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.155  spacing=169cm
   Seq  685  frames 19837–19865  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.005  spacing=185cm
   Seq  686  frames 19866–19894  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.083  spacing=167cm
-  Seq  687  frames 19895–19923  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=+0.013  spacing=163cm
+  Seq  687  frames 19895–19923  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=+0.014  spacing=159cm
   Seq  688  frames 19924–19952  →  [0] TRANSITION / DEAD BALL  conf=1.000  H=0.00b  sync=-0.009  spacing=165cm
   Seq  689  frames 19953–19981  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=+0.006  spacing=192cm
   Seq  690  frames 19982–20010  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=-0.050  spacing=187cm
@@ -792,8 +792,8 @@ Processing frames…
   Seq  699  frames 20243–20271  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.009  spacing=232cm
   Seq  700  frames 20272–20300  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.105  spacing=234cm
   Seq  701  frames 20301–20329  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.267  spacing=245cm
-  Seq  702  frames 20330–20358  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=+0.145  spacing=252cm
-  Seq  703  frames 20359–20387  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=+0.017  spacing=270cm
+  Seq  702  frames 20330–20358  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=+0.111  spacing=267cm
+  Seq  703  frames 20359–20387  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=+0.047  spacing=289cm
   … 20400/90451 frames (23%)
   Seq  704  frames 20388–20416  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.113  spacing=249cm
   Seq  705  frames 20417–20445  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=+0.003  spacing=305cm
@@ -807,18 +807,18 @@ Processing frames…
   Seq  713  frames 20649–20677  →  [0] TRANSITION / DEAD BALL  conf=1.000  H=0.00b  sync=-0.004  spacing=172cm
   … 20700/90451 frames (23%)
   Seq  714  frames 20678–20706  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.015  spacing=179cm
-  Seq  715  frames 20707–20735  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.086  spacing=196cm
+  Seq  715  frames 20707–20735  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.098  spacing=197cm
   Seq  716  frames 20736–20764  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.013  spacing=212cm
   Seq  717  frames 20765–20793  →  [0] TRANSITION / DEAD BALL  conf=1.000  H=0.00b  sync=+0.058  spacing=157cm
   Seq  718  frames 20794–20822  →  [0] TRANSITION / DEAD BALL  conf=1.000  H=0.00b  sync=+0.030  spacing=135cm
   Seq  719  frames 20823–20851  →  [3] DELAYED SUPPORT         conf=1.000  H=0.00b  sync=-0.015  spacing=127cm
   Seq  720  frames 20852–20880  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.073  spacing=141cm
   Seq  721  frames 20881–20909  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.081  spacing=151cm
-  Seq  722  frames 20910–20938  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.055  spacing=161cm
-  Seq  723  frames 20939–20967  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.158  spacing=224cm
-  Seq  724  frames 20968–20996  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.134  spacing=226cm
+  Seq  722  frames 20910–20938  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.104  spacing=162cm
+  Seq  723  frames 20939–20967  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.152  spacing=224cm
+  Seq  724  frames 20968–20996  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.178  spacing=228cm
   … 21000/90451 frames (23%)
-  Seq  725  frames 20997–21025  →  [0] TRANSITION / DEAD BALL  conf=1.000  H=0.00b  sync=+0.253  spacing=272cm
+  Seq  725  frames 20997–21025  →  [0] TRANSITION / DEAD BALL  conf=1.000  H=0.00b  sync=+0.280  spacing=262cm
   Seq  726  frames 21026–21054  →  [0] TRANSITION / DEAD BALL  conf=1.000  H=0.00b  sync=+0.173  spacing=219cm
   Seq  727  frames 21055–21083  →  [0] TRANSITION / DEAD BALL  conf=1.000  H=0.00b  sync=+0.146  spacing=188cm
   Seq  728  frames 21084–21112  →  [0] TRANSITION / DEAD BALL  conf=1.000  H=0.00b  sync=+0.127  spacing=171cm
@@ -830,7 +830,7 @@ Processing frames…
   Seq  734  frames 21258–21286  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=-0.007  spacing=261cm
   … 21300/90451 frames (24%)
   Seq  735  frames 21287–21315  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.048  spacing=260cm
-  Seq  736  frames 21316–21344  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=-0.092  spacing=290cm
+  Seq  736  frames 21316–21344  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=-0.061  spacing=320cm
   Seq  737  frames 21345–21373  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.001  spacing=233cm
   Seq  738  frames 21374–21402  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.022  spacing=212cm
   Seq  739  frames 21403–21431  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.183  spacing=177cm
@@ -845,8 +845,8 @@ Processing frames…
   Seq  747  frames 21635–21663  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.029  spacing=206cm
   Seq  748  frames 21664–21692  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.074  spacing=236cm
   Seq  749  frames 21693–21721  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=+0.059  spacing=234cm
-  Seq  750  frames 21722–21750  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=+0.032  spacing=238cm
-  Seq  751  frames 21751–21779  →  [4] SPACING BREAKDOWN       conf=1.000  H=0.00b  sync=+0.033  spacing=173cm
+  Seq  750  frames 21722–21750  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=+0.038  spacing=238cm
+  Seq  751  frames 21751–21779  →  [4] SPACING BREAKDOWN       conf=1.000  H=0.00b  sync=-0.017  spacing=173cm
   Seq  752  frames 21780–21808  →  [3] DELAYED SUPPORT         conf=1.000  H=0.00b  sync=+0.101  spacing=214cm
   Seq  753  frames 21809–21837  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=-0.008  spacing=210cm
   Seq  754  frames 21838–21866  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=-0.022  spacing=180cm
@@ -858,17 +858,17 @@ Processing frames…
   Seq  759  frames 21983–22011  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=-0.064  spacing=205cm
   Seq  760  frames 22012–22040  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=-0.015  spacing=255cm
   Seq  761  frames 22041–22069  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=+0.098  spacing=251cm
-  Seq  762  frames 22070–22098  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.041  spacing=242cm
+  Seq  762  frames 22070–22098  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.114  spacing=202cm
   Seq  763  frames 22099–22127  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.083  spacing=240cm
   Seq  764  frames 22128–22156  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=-0.017  spacing=192cm
   Seq  765  frames 22157–22185  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=-0.097  spacing=219cm
   … 22200/90451 frames (25%)
-  Seq  766  frames 22186–22214  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=+0.020  spacing=236cm
+  Seq  766  frames 22186–22214  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=+0.030  spacing=242cm
   Seq  767  frames 22215–22243  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.126  spacing=239cm
   Seq  768  frames 22244–22272  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.124  spacing=232cm
   Seq  769  frames 22273–22301  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=-0.007  spacing=231cm
   Seq  770  frames 22302–22330  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=-0.071  spacing=206cm
-  Seq  771  frames 22331–22359  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=-0.061  spacing=207cm
+  Seq  771  frames 22331–22359  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=-0.090  spacing=204cm
   Seq  772  frames 22360–22388  →  [0] TRANSITION / DEAD BALL  conf=1.000  H=0.00b  sync=+0.102  spacing=226cm
   Seq  773  frames 22389–22417  →  [0] TRANSITION / DEAD BALL  conf=1.000  H=0.00b  sync=+0.229  spacing=214cm
   Seq  774  frames 22418–22446  →  [0] TRANSITION / DEAD BALL  conf=1.000  H=0.00b  sync=+0.250  spacing=210cm
@@ -878,7 +878,7 @@ Processing frames…
   Seq  777  frames 22505–22533  →  [3] DELAYED SUPPORT         conf=1.000  H=0.00b  sync=+0.003  spacing=241cm
   Seq  778  frames 22534–22562  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=-0.047  spacing=206cm
   Seq  779  frames 22563–22591  →  [3] DELAYED SUPPORT         conf=1.000  H=0.00b  sync=-0.122  spacing=275cm
-  Seq  780  frames 22592–22620  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=-0.027  spacing=290cm
+  Seq  780  frames 22592–22620  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=-0.066  spacing=263cm
   Seq  781  frames 22621–22649  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=+0.093  spacing=285cm
   Seq  782  frames 22650–22678  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=+0.301  spacing=292cm
   Seq  783  frames 22679–22707  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=-0.093  spacing=230cm
@@ -887,15 +887,15 @@ Processing frames…
   Seq  786  frames 22766–22794  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.072  spacing=237cm
   … 22800/90451 frames (25%)
   Seq  787  frames 22795–22823  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=-0.007  spacing=215cm
-  Seq  788  frames 22824–22852  →  [0] TRANSITION / DEAD BALL  conf=1.000  H=0.00b  sync=+0.129  spacing=251cm
+  Seq  788  frames 22824–22852  →  [0] TRANSITION / DEAD BALL  conf=1.000  H=0.00b  sync=+0.119  spacing=251cm
   Seq  789  frames 22853–22881  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=-0.072  spacing=294cm
-  Seq  790  frames 22882–22910  →  [4] SPACING BREAKDOWN       conf=1.000  H=0.00b  sync=-0.053  spacing=276cm
+  Seq  790  frames 22882–22910  →  [4] SPACING BREAKDOWN       conf=1.000  H=0.00b  sync=+0.026  spacing=295cm
   Seq  791  frames 22911–22939  →  [0] TRANSITION / DEAD BALL  conf=1.000  H=0.00b  sync=+0.189  spacing=200cm
   Seq  792  frames 22940–22968  →  [0] TRANSITION / DEAD BALL  conf=1.000  H=0.00b  sync=+0.243  spacing=200cm
   Seq  793  frames 22969–22997  →  [0] TRANSITION / DEAD BALL  conf=1.000  H=0.00b  sync=+0.053  spacing=230cm
   Seq  794  frames 22998–23026  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.056  spacing=211cm
   Seq  795  frames 23027–23055  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.041  spacing=220cm
-  Seq  796  frames 23056–23084  →  [3] DELAYED SUPPORT         conf=1.000  H=0.00b  sync=+0.013  spacing=170cm
+  Seq  796  frames 23056–23084  →  [3] DELAYED SUPPORT         conf=1.000  H=0.00b  sync=+0.012  spacing=170cm
   … 23100/90451 frames (26%)
   Seq  797  frames 23085–23113  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=+0.097  spacing=158cm
   Seq  798  frames 23114–23142  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=-0.005  spacing=184cm
@@ -903,26 +903,26 @@ Processing frames…
   Seq  800  frames 23172–23200  →  [0] TRANSITION / DEAD BALL  conf=1.000  H=0.00b  sync=-0.046  spacing=204cm
   Seq  801  frames 23201–23229  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=-0.024  spacing=208cm
   Seq  802  frames 23230–23258  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.190  spacing=219cm
-  Seq  803  frames 23259–23287  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=+0.130  spacing=232cm
+  Seq  803  frames 23259–23287  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=+0.122  spacing=228cm
   Seq  804  frames 23288–23316  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=+0.149  spacing=248cm
   Seq  805  frames 23317–23345  →  [0] TRANSITION / DEAD BALL  conf=1.000  H=0.00b  sync=+0.004  spacing=226cm
-  Seq  806  frames 23346–23374  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.030  spacing=288cm
+  Seq  806  frames 23346–23374  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.080  spacing=263cm
   … 23400/90451 frames (26%)
   Seq  807  frames 23375–23403  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=-0.001  spacing=276cm
   Seq  808  frames 23404–23432  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=-0.036  spacing=274cm
-  Seq  809  frames 23433–23461  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=-0.082  spacing=268cm
+  Seq  809  frames 23433–23461  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=-0.077  spacing=268cm
   Seq  810  frames 23462–23490  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=-0.020  spacing=235cm
   Seq  811  frames 23491–23519  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=+0.021  spacing=177cm
   Seq  812  frames 23520–23548  →  [0] TRANSITION / DEAD BALL  conf=1.000  H=0.00b  sync=+0.068  spacing=200cm
   Seq  813  frames 23549–23577  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=+0.191  spacing=151cm
-  Seq  814  frames 23578–23606  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.093  spacing=169cm
-  Seq  815  frames 23607–23635  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.179  spacing=186cm
+  Seq  814  frames 23578–23606  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.141  spacing=175cm
+  Seq  815  frames 23607–23635  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.184  spacing=182cm
   Seq  816  frames 23636–23664  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.289  spacing=182cm
   Seq  817  frames 23665–23693  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.112  spacing=201cm
   … 23700/90451 frames (26%)
-  Seq  818  frames 23694–23722  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=+0.242  spacing=222cm
-  Seq  819  frames 23723–23751  →  [3] DELAYED SUPPORT         conf=1.000  H=0.00b  sync=+0.168  spacing=199cm
-  Seq  820  frames 23752–23780  →  [0] TRANSITION / DEAD BALL  conf=1.000  H=0.00b  sync=+0.179  spacing=189cm
+  Seq  818  frames 23694–23722  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=+0.202  spacing=228cm
+  Seq  819  frames 23723–23751  →  [3] DELAYED SUPPORT         conf=1.000  H=0.00b  sync=+0.170  spacing=197cm
+  Seq  820  frames 23752–23780  →  [0] TRANSITION / DEAD BALL  conf=1.000  H=0.00b  sync=+0.170  spacing=176cm
   Seq  821  frames 23781–23809  →  [0] TRANSITION / DEAD BALL  conf=1.000  H=0.00b  sync=+0.039  spacing=200cm
   Seq  822  frames 23810–23838  →  [0] TRANSITION / DEAD BALL  conf=1.000  H=0.00b  sync=+0.021  spacing=213cm
   Seq  823  frames 23839–23867  →  [0] TRANSITION / DEAD BALL  conf=1.000  H=0.00b  sync=+0.052  spacing=215cm
@@ -935,9 +935,9 @@ Processing frames…
   Seq  829  frames 24013–24041  →  [0] TRANSITION / DEAD BALL  conf=1.000  H=0.00b  sync=-0.091  spacing=166cm
   Seq  830  frames 24042–24070  →  [0] TRANSITION / DEAD BALL  conf=1.000  H=0.00b  sync=+0.026  spacing=168cm
   Seq  831  frames 24071–24099  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=-0.053  spacing=149cm
-  Seq  832  frames 24100–24128  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.088  spacing=248cm
+  Seq  832  frames 24100–24128  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.097  spacing=223cm
   Seq  833  frames 24129–24157  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=-0.046  spacing=191cm
-  Seq  834  frames 24158–24186  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.009  spacing=278cm
+  Seq  834  frames 24158–24186  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.067  spacing=273cm
   Seq  835  frames 24187–24215  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=-0.047  spacing=344cm
   Seq  836  frames 24216–24244  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=+0.111  spacing=287cm
   Seq  837  frames 24245–24273  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.097  spacing=217cm
@@ -945,19 +945,19 @@ Processing frames…
   Seq  838  frames 24274–24302  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.004  spacing=235cm
   Seq  839  frames 24303–24331  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=-0.051  spacing=223cm
   Seq  840  frames 24332–24360  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.020  spacing=235cm
-  Seq  841  frames 24361–24389  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=-0.058  spacing=226cm
-  Seq  842  frames 24390–24418  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=-0.025  spacing=207cm
+  Seq  841  frames 24361–24389  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=-0.067  spacing=220cm
+  Seq  842  frames 24390–24418  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=-0.049  spacing=215cm
   Seq  843  frames 24419–24447  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=-0.041  spacing=238cm
-  Seq  844  frames 24448–24476  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.068  spacing=238cm
-  Seq  845  frames 24477–24505  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=-0.004  spacing=261cm
+  Seq  844  frames 24448–24476  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.000  spacing=185cm
+  Seq  845  frames 24477–24505  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=-0.059  spacing=247cm
   Seq  846  frames 24506–24534  →  [0] TRANSITION / DEAD BALL  conf=1.000  H=0.00b  sync=-0.099  spacing=181cm
   Seq  847  frames 24535–24563  →  [3] DELAYED SUPPORT         conf=1.000  H=0.00b  sync=-0.034  spacing=172cm
   Seq  848  frames 24564–24592  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=-0.071  spacing=164cm
   … 24600/90451 frames (27%)
   Seq  849  frames 24593–24621  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=-0.014  spacing=150cm
-  Seq  850  frames 24622–24650  →  [3] DELAYED SUPPORT         conf=1.000  H=0.00b  sync=-0.042  spacing=215cm
+  Seq  850  frames 24622–24650  →  [3] DELAYED SUPPORT         conf=1.000  H=0.00b  sync=-0.010  spacing=216cm
   Seq  851  frames 24651–24679  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=-0.063  spacing=225cm
-  Seq  852  frames 24680–24708  →  [3] DELAYED SUPPORT         conf=1.000  H=0.00b  sync=-0.023  spacing=215cm
+  Seq  852  frames 24680–24708  →  [3] DELAYED SUPPORT         conf=1.000  H=0.00b  sync=-0.023  spacing=214cm
   Seq  853  frames 24709–24737  →  [0] TRANSITION / DEAD BALL  conf=1.000  H=0.00b  sync=+0.262  spacing=258cm
   Seq  854  frames 24738–24766  →  [0] TRANSITION / DEAD BALL  conf=1.000  H=0.00b  sync=+0.235  spacing=241cm
   Seq  855  frames 24767–24795  →  [0] TRANSITION / DEAD BALL  conf=1.000  H=0.00b  sync=+0.203  spacing=238cm
@@ -1101,10 +1101,10 @@ Processing frames…
   Seq  981  frames 28421–28449  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=-0.010  spacing=173cm
   Seq  982  frames 28450–28478  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=+0.075  spacing=110cm
   … 28500/90451 frames (32%)
-  Seq  983  frames 28479–28507  →  [3] DELAYED SUPPORT         conf=1.000  H=0.00b  sync=+0.082  spacing=196cm
-  Seq  984  frames 28508–28536  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.095  spacing=202cm
-  Seq  985  frames 28537–28565  →  [4] SPACING BREAKDOWN       conf=1.000  H=0.00b  sync=+0.038  spacing=217cm
-  Seq  986  frames 28566–28594  →  [0] TRANSITION / DEAD BALL  conf=1.000  H=0.00b  sync=+0.496  spacing=256cm
+  Seq  983  frames 28479–28507  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.118  spacing=143cm
+  Seq  984  frames 28508–28536  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.178  spacing=105cm
+  Seq  985  frames 28537–28565  →  [4] SPACING BREAKDOWN       conf=1.000  H=0.00b  sync=+0.155  spacing=175cm
+  Seq  986  frames 28566–28594  →  [0] TRANSITION / DEAD BALL  conf=1.000  H=0.00b  sync=+0.498  spacing=258cm
   Seq  987  frames 28595–28623  →  [0] TRANSITION / DEAD BALL  conf=1.000  H=0.00b  sync=+0.383  spacing=254cm
   Seq  988  frames 28624–28652  →  [0] TRANSITION / DEAD BALL  conf=1.000  H=0.00b  sync=+0.292  spacing=249cm
   Seq  989  frames 28653–28681  →  [0] TRANSITION / DEAD BALL  conf=1.000  H=0.00b  sync=+0.205  spacing=247cm
@@ -1126,7 +1126,7 @@ Processing frames…
   … 29100/90451 frames (32%)
   Seq 1004  frames 29088–29116  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=+0.073  spacing=124cm
   Seq 1005  frames 29117–29145  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.228  spacing=196cm
-  Seq 1006  frames 29146–29174  →  [0] TRANSITION / DEAD BALL  conf=1.000  H=0.00b  sync=+0.404  spacing=254cm
+  Seq 1006  frames 29146–29174  →  [0] TRANSITION / DEAD BALL  conf=1.000  H=0.00b  sync=+0.380  spacing=255cm
   Seq 1007  frames 29175–29203  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.491  spacing=256cm
   Seq 1008  frames 29204–29232  →  [0] TRANSITION / DEAD BALL  conf=1.000  H=0.00b  sync=+0.455  spacing=244cm
   Seq 1009  frames 29233–29261  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.166  spacing=253cm
@@ -1135,16 +1135,16 @@ Processing frames…
   Seq 1012  frames 29320–29348  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.044  spacing=298cm
   Seq 1013  frames 29349–29377  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=-0.023  spacing=238cm
   … 29400/90451 frames (33%)
-  Seq 1014  frames 29378–29406  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.065  spacing=233cm
-  Seq 1015  frames 29407–29435  →  [3] DELAYED SUPPORT         conf=1.000  H=0.00b  sync=+0.114  spacing=243cm
+  Seq 1014  frames 29378–29406  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.059  spacing=233cm
+  Seq 1015  frames 29407–29435  →  [3] DELAYED SUPPORT         conf=1.000  H=0.00b  sync=+0.073  spacing=240cm
   Seq 1016  frames 29436–29464  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=+0.233  spacing=299cm
   Seq 1017  frames 29465–29493  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.111  spacing=233cm
   Seq 1018  frames 29494–29522  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.024  spacing=177cm
   Seq 1019  frames 29523–29551  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.107  spacing=131cm
   Seq 1020  frames 29552–29580  →  [2] DEFENDING               conf=1.000  H=0.00b  sync=-0.089  spacing=113cm
   Seq 1021  frames 29581–29609  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.099  spacing=143cm
-  Seq 1022  frames 29610–29638  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.009  spacing=174cm
-  Seq 1023  frames 29639–29667  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.113  spacing=171cm
+  Seq 1022  frames 29610–29638  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=-0.011  spacing=171cm
+  Seq 1023  frames 29639–29667  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.102  spacing=164cm
   Seq 1024  frames 29668–29696  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.035  spacing=117cm
   … 29700/90451 frames (33%)
   Seq 1025  frames 29697–29725  →  [1] ATTACKING               conf=1.000  H=0.00b  sync=+0.182  spacing=142cm
@@ -1160,7 +1160,7 @@ Processing frames…
   … 30000/90451 frames (33%)
 Reached --max-frames limit (30000); stopping.
 
-Annotated video saved to 'heatmaps/_stage_a_boxes_10min.mp4'.
+Annotated video saved to 'heatmaps/_stage_a_v2_10min.mp4'.
 
 Total frames processed : 30001
 Total sequences classified : 1034
@@ -1170,13 +1170,13 @@ Detections masked outside court : 69586
 ========================================================
            Team Coordination Analysis
 ========================================================
-  [1] Coordinated Attack   :  468   45%  █████████░░░░░░░░░░░
+  [1] Coordinated Attack   :  470   45%  █████████░░░░░░░░░░░
   [2] Coordinated Defense  :  278   27%  █████░░░░░░░░░░░░░░░
-  [3] Delayed Support      :   81    8%  ██░░░░░░░░░░░░░░░░░░
-  [4] Spacing Breakdown    :   23    2%  ░░░░░░░░░░░░░░░░░░░░
-  [0] Unclassified/Trans.  :  184   18%  ████░░░░░░░░░░░░░░░░
+  [3] Delayed Support      :   76    7%  █░░░░░░░░░░░░░░░░░░░
+  [4] Spacing Breakdown    :   24    2%  ░░░░░░░░░░░░░░░░░░░░
+  [0] Unclassified/Trans.  :  186   18%  ████░░░░░░░░░░░░░░░░
 
-  Total windows analysed        : 1034  (tactical: 850)
+  Total windows analysed        : 1034  (tactical: 848)
   Coordination efficiency score : 88%
 
   Insights:
