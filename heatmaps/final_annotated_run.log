@@ -1,0 +1,115 @@
+Video file    : videoplayback (3).mp4
+Events found  : 108
+Total runtime : 108.0s (1.8 min) of compiled clips
+  [  1/108] COORDINATED DEFENSE       2.50s -    3.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_001.mp4
+  [  2/108] COORDINATED ATTACK        5.00s -    6.00s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_002.mp4
+  [  3/108] COORDINATED ATTACK       25.00s -   26.00s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_003.mp4
+  [  4/108] COORDINATED DEFENSE      37.50s -   38.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_004.mp4
+  [  5/108] DELAYED SUPPORT          50.00s -   51.00s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_005.mp4
+  [  6/108] COORDINATED DEFENSE      71.50s -   72.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_006.mp4
+  [  7/108] COORDINATED DEFENSE      77.50s -   78.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_007.mp4
+  [  8/108] COORDINATED ATTACK       81.00s -   82.00s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_008.mp4
+  [  9/108] COORDINATED DEFENSE      90.50s -   91.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_009.mp4
+  [ 10/108] COORDINATED DEFENSE      91.50s -   92.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_010.mp4
+  [ 11/108] COORDINATED ATTACK       93.00s -   94.00s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_011.mp4
+  [ 12/108] COORDINATED DEFENSE     102.50s -  103.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_012.mp4
+  [ 13/108] COORDINATED DEFENSE     104.50s -  105.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_013.mp4
+  [ 14/108] COORDINATED ATTACK      106.00s -  107.00s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_014.mp4
+  [ 15/108] COORDINATED DEFENSE     107.50s -  108.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_015.mp4
+  [ 16/108] COORDINATED DEFENSE     109.50s -  110.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_016.mp4
+  [ 17/108] COORDINATED ATTACK      111.00s -  112.00s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_017.mp4
+  [ 18/108] COORDINATED DEFENSE     122.50s -  123.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_018.mp4
+  [ 19/108] COORDINATED DEFENSE     126.50s -  127.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_019.mp4
+  [ 20/108] COORDINATED DEFENSE     129.50s -  130.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_020.mp4
+  [ 21/108] COORDINATED ATTACK      132.00s -  133.00s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_021.mp4
+  [ 22/108] COORDINATED DEFENSE     135.50s -  136.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_022.mp4
+  [ 23/108] COORDINATED DEFENSE     143.50s -  144.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_023.mp4
+  [ 24/108] COORDINATED DEFENSE     144.50s -  145.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_024.mp4
+  [ 25/108] COORDINATED ATTACK      146.00s -  147.00s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_025.mp4
+  [ 26/108] COORDINATED DEFENSE     162.50s -  163.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_026.mp4
+  [ 27/108] COORDINATED DEFENSE     164.50s -  165.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_027.mp4
+  [ 28/108] COORDINATED ATTACK      166.00s -  167.00s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_028.mp4
+  [ 29/108] DELAYED SUPPORT         178.00s -  179.00s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_029.mp4
+  [ 30/108] COORDINATED DEFENSE     185.50s -  186.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_030.mp4
+  [ 31/108] COORDINATED DEFENSE     186.50s -  187.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_031.mp4
+  [ 32/108] COORDINATED ATTACK      188.00s -  189.00s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_032.mp4
+  [ 33/108] COORDINATED DEFENSE     205.50s -  206.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_033.mp4
+  [ 34/108] COORDINATED DEFENSE     206.50s -  207.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_034.mp4
+  [ 35/108] COORDINATED ATTACK      208.00s -  209.00s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_035.mp4
+  [ 36/108] COORDINATED DEFENSE     220.50s -  221.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_036.mp4
+  [ 37/108] COORDINATED DEFENSE     222.50s -  223.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_037.mp4
+  [ 38/108] COORDINATED ATTACK      225.00s -  226.00s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_038.mp4
+  [ 39/108] COORDINATED DEFENSE     227.50s -  228.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_039.mp4
+  [ 40/108] COORDINATED DEFENSE     229.50s -  230.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_040.mp4
+  [ 41/108] COORDINATED DEFENSE     230.50s -  231.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_041.mp4
+  [ 42/108] COORDINATED ATTACK      232.00s -  233.00s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_042.mp4
+  [ 43/108] DELAYED SUPPORT         253.00s -  254.00s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_043.mp4
+  [ 44/108] COORDINATED DEFENSE     271.50s -  272.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_044.mp4
+  [ 45/108] COORDINATED DEFENSE     282.50s -  283.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_045.mp4
+  [ 46/108] COORDINATED DEFENSE     283.50s -  284.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_046.mp4
+  [ 47/108] COORDINATED ATTACK      285.00s -  286.00s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_047.mp4
+  [ 48/108] COORDINATED DEFENSE     286.50s -  287.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_048.mp4
+  [ 49/108] COORDINATED DEFENSE     287.50s -  288.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_049.mp4
+  [ 50/108] COORDINATED ATTACK      289.00s -  290.00s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_050.mp4
+  [ 51/108] COORDINATED DEFENSE     291.50s -  292.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_051.mp4
+  [ 52/108] COORDINATED DEFENSE     292.50s -  293.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_052.mp4
+  [ 53/108] COORDINATED ATTACK      294.00s -  295.00s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_053.mp4
+  [ 54/108] DELAYED SUPPORT         307.00s -  308.00s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_054.mp4
+  [ 55/108] COORDINATED DEFENSE     339.50s -  340.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_055.mp4
+  [ 56/108] COORDINATED DEFENSE     341.50s -  342.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_056.mp4
+  [ 57/108] COORDINATED ATTACK      343.00s -  344.00s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_057.mp4
+  [ 58/108] COORDINATED DEFENSE     354.50s -  355.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_058.mp4
+  [ 59/108] COORDINATED DEFENSE     355.50s -  356.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_059.mp4
+  [ 60/108] COORDINATED DEFENSE     358.50s -  359.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_060.mp4
+  [ 61/108] COORDINATED ATTACK      360.00s -  361.00s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_061.mp4
+  [ 62/108] COORDINATED DEFENSE     362.50s -  363.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_062.mp4
+  [ 63/108] COORDINATED DEFENSE     363.50s -  364.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_063.mp4
+  [ 64/108] COORDINATED ATTACK      365.00s -  366.00s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_064.mp4
+  [ 65/108] DELAYED SUPPORT         377.00s -  378.00s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_065.mp4
+  [ 66/108] COORDINATED DEFENSE     385.50s -  386.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_066.mp4
+  [ 67/108] COORDINATED DEFENSE     388.50s -  389.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_067.mp4
+  [ 68/108] COORDINATED ATTACK      390.00s -  391.00s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_068.mp4
+  [ 69/108] COORDINATED DEFENSE     401.50s -  402.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_069.mp4
+  [ 70/108] COORDINATED DEFENSE     406.50s -  407.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_070.mp4
+  [ 71/108] COORDINATED DEFENSE     407.50s -  408.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_071.mp4
+  [ 72/108] COORDINATED DEFENSE     409.50s -  410.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_072.mp4
+  [ 73/108] COORDINATED DEFENSE     410.50s -  411.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_073.mp4
+  [ 74/108] DELAYED SUPPORT         415.00s -  416.00s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_074.mp4
+  [ 75/108] COORDINATED DEFENSE     423.50s -  424.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_075.mp4
+  [ 76/108] COORDINATED DEFENSE     424.50s -  425.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_076.mp4
+  [ 77/108] COORDINATED ATTACK      426.00s -  427.00s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_077.mp4
+  [ 78/108] COORDINATED DEFENSE     431.50s -  432.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_078.mp4
+  [ 79/108] COORDINATED DEFENSE     433.50s -  434.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_079.mp4
+  [ 80/108] COORDINATED ATTACK      435.00s -  436.00s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_080.mp4
+  [ 81/108] COORDINATED DEFENSE     437.50s -  438.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_081.mp4
+  [ 82/108] COORDINATED DEFENSE     438.50s -  439.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_082.mp4
+  [ 83/108] COORDINATED DEFENSE     439.50s -  440.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_083.mp4
+  [ 84/108] COORDINATED ATTACK      441.00s -  442.00s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_084.mp4
+  [ 85/108] COORDINATED DEFENSE     449.50s -  450.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_085.mp4
+  [ 86/108] COORDINATED DEFENSE     451.50s -  452.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_086.mp4
+  [ 87/108] COORDINATED ATTACK      453.00s -  454.00s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_087.mp4
+  [ 88/108] COORDINATED DEFENSE     465.50s -  466.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_088.mp4
+  [ 89/108] COORDINATED DEFENSE     466.50s -  467.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_089.mp4
+  [ 90/108] COORDINATED DEFENSE     467.50s -  468.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_090.mp4
+  [ 91/108] COORDINATED ATTACK      469.00s -  470.00s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_091.mp4
+  [ 92/108] COORDINATED DEFENSE     479.50s -  480.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_092.mp4
+  [ 93/108] COORDINATED DEFENSE     482.50s -  483.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_093.mp4
+  [ 94/108] COORDINATED ATTACK      484.00s -  485.00s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_094.mp4
+  [ 95/108] SPACING BREAKDOWN       489.00s -  490.00s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_095.mp4
+  [ 96/108] COORDINATED DEFENSE     496.50s -  497.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_096.mp4
+  [ 97/108] COORDINATED DEFENSE     498.50s -  499.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_097.mp4
+  [ 98/108] COORDINATED ATTACK      500.00s -  501.00s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_098.mp4
+  [ 99/108] COORDINATED DEFENSE     512.50s -  513.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_099.mp4
+  [100/108] COORDINATED DEFENSE     513.50s -  514.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_100.mp4
+  [101/108] COORDINATED DEFENSE     514.50s -  515.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_101.mp4
+  [102/108] COORDINATED ATTACK      516.00s -  517.00s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_102.mp4
+  [103/108] COORDINATED DEFENSE     554.50s -  555.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_103.mp4
+  [104/108] COORDINATED DEFENSE     556.50s -  557.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_104.mp4
+  [105/108] COORDINATED ATTACK      558.00s -  559.00s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_105.mp4
+  [106/108] COORDINATED DEFENSE     573.50s -  574.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_106.mp4
+  [107/108] COORDINATED DEFENSE     574.50s -  575.50s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_107.mp4
+  [108/108] COORDINATED ATTACK      576.00s -  577.00s  (1.00s)  -> C:\Users\YASHWA~1\AppData\Local\Temp\final_annotated_r1h0obq7\seg_108.mp4
+
+Concatenating 108 clips -> HEATMAPS_OUTPUT/FINAL_ANNOTATED.mp4 ...
+
+Done -> HEATMAPS_OUTPUT/FINAL_ANNOTATED.mp4

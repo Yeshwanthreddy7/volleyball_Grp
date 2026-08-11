@@ -54,6 +54,7 @@ Outputs (written to heatmaps/)
 
 from __future__ import annotations
 
+import argparse
 import os
 import sys
 import time
@@ -63,6 +64,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
+from matplotlib.ticker import FuncFormatter
 from scipy.ndimage import gaussian_filter
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -74,8 +76,18 @@ from ultralytics import YOLO  # noqa: E402
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
-VIDEO_PATH = os.path.join(ROOT, "dataset", "videoplayback (3).mp4")
-VIDEO_TAG = "videoplayback (3)"
+_ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+_ap.add_argument("--video-file", default="videoplayback (3).mp4",
+                  help="Basename under dataset/ to process (default: "
+                       "'videoplayback (3).mp4'). Drives VIDEO_PATH, VIDEO_TAG, "
+                       "and the output filenames below, so different source "
+                       "videos never collide or overwrite each other's output.")
+_args, _ = _ap.parse_known_args()
+
+VIDEO_FILE = _args.video_file
+VIDEO_PATH = os.path.join(ROOT, "dataset", VIDEO_FILE)
+VIDEO_TAG = os.path.splitext(VIDEO_FILE)[0]              # e.g. "videoplayback (4)"
+VIDEO_SAFE = VIDEO_TAG.replace(" ", "_").replace("(", "").replace(")", "")  # e.g. "videoplayback_4"
 OUT_DIR = os.path.join(ROOT, "heatmaps")
 os.makedirs(OUT_DIR, exist_ok=True)
 
@@ -268,7 +280,7 @@ def run_detection() -> pd.DataFrame:
           f"{court.n_hits}/{court.n_misses}")
 
     df = pd.DataFrame(rows)
-    csv_path = os.path.join(OUT_DIR, "videoplayback_3_direct_detections.csv")
+    csv_path = os.path.join(OUT_DIR, f"{VIDEO_SAFE}_direct_detections.csv")
     df.to_csv(csv_path, index=False)
     print(f"Wrote raw detections -> {csv_path}")
     return df
@@ -288,8 +300,25 @@ def draw_court(ax) -> None:
         ax.axhline(y, color=INK_MUTED, linewidth=1.1, linestyle=(0, (6, 4)), zorder=5)
     ax.set_xlim(-40, COURT_W_CM + 40)
     ax.set_ylim(-40, COURT_H_CM + 40)
+    # Our team occupies the LARGER Y values (450-900, near baseline at 900) -
+    # matplotlib draws Y increasing upward by default, which would put our
+    # team's data at the TOP of the chart. Flip so it renders at the BOTTOM
+    # instead, matching the camera framing everyone actually expects (our
+    # team = bottom of frame = bottom of chart, net in the middle, opponent
+    # half on top).
+    ax.invert_yaxis()
+    # Relabel the tick TEXT only (never the underlying data/homography, which
+    # stays on the project-wide convention used everywhere else - court.py,
+    # the CSVs, etc: 0=far baseline, 900=near/our baseline). Readers expect
+    # "0" to mean "our baseline" and the numbers to climb as you move away
+    # from us toward the net and beyond, so print (900 - value) instead of
+    # the raw stored Y - same gridlines, same plotted positions, different
+    # printed number.
+    ax.yaxis.set_major_formatter(FuncFormatter(lambda val, pos: f"{COURT_H_CM - val:.0f}"))
     ax.set_xlabel("Court X (cm)", color=INK_SECONDARY, fontsize=10)
-    ax.set_ylabel("Court Y (cm)", color=INK_SECONDARY, fontsize=10)
+    ax.set_ylabel("Court Y (cm)  -  distance from our baseline (0 = our baseline, "
+                  f"{NET_Y_CM:.0f} = net, {COURT_H_CM:.0f} = far baseline)",
+                  color=INK_SECONDARY, fontsize=10)
     ax.tick_params(colors=INK_MUTED, labelsize=8)
     for spine in ax.spines.values():
         spine.set_visible(False)
