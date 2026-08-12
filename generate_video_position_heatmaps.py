@@ -379,18 +379,28 @@ def render_dual_heatmap(
     near_xy: np.ndarray, far_xy: np.ndarray,
     near_label: str, far_label: str,
     title: str, subtitle: str, out_path: str,
+    near_cmap=None, far_cmap=None,
+    near_color: str | None = None, far_color: str | None = None,
 ) -> None:
-    """Two overlaid single-hue density layers (near=red, far=amber) on one
-    court plot, each at reduced alpha so overlap blends rather than occludes.
+    """Two overlaid single-hue density layers on one court plot, each at
+    reduced alpha so overlap blends rather than occludes. Defaults to
+    near=red/far=amber (the player-team convention); pass near_cmap/far_cmap
+    (+ matching legend near_color/far_color) to reuse this for a different
+    two-way split, e.g. blue/orange for "which half the ball was in".
     A labelled legend carries identity - required per the dataviz skill,
     since ambiguous overlap and the amber layer's sub-3:1 surface contrast
     both rule out color-alone identification."""
+    near_cmap = near_cmap or RED_CMAP
+    far_cmap = far_cmap or AMBER_CMAP
+    near_color = near_color or NEAR_TEAM_COLOR
+    far_color = far_color or FAR_TEAM_COLOR
+
     fig, ax = plt.subplots(figsize=(11, 6.2), dpi=150)
     fig.patch.set_facecolor(SURFACE)
     draw_court(ax)
 
     extent = [-40, COURT_W_CM + 40, -40, COURT_H_CM + 40]
-    for xy, cmap in ((far_xy, AMBER_CMAP), (near_xy, RED_CMAP)):
+    for xy, cmap in ((far_xy, far_cmap), (near_xy, near_cmap)):
         density = _density(xy)
         if density is not None:
             ax.imshow(
@@ -400,10 +410,10 @@ def render_dual_heatmap(
 
     legend_handles = [
         plt.Line2D([0], [0], marker="s", linestyle="", markersize=11,
-                   markerfacecolor=NEAR_TEAM_COLOR, markeredgewidth=0,
+                   markerfacecolor=near_color, markeredgewidth=0,
                    label=f"{near_label}  (n={len(near_xy)})"),
         plt.Line2D([0], [0], marker="s", linestyle="", markersize=11,
-                   markerfacecolor=FAR_TEAM_COLOR, markeredgewidth=0,
+                   markerfacecolor=far_color, markeredgewidth=0,
                    label=f"{far_label}  (n={len(far_xy)})"),
     ]
     legend = ax.legend(
