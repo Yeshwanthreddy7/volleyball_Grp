@@ -287,6 +287,62 @@ def run_detection() -> pd.DataFrame:
 
 
 # ---------------------------------------------------------------------------
+# Static false-positive filter
+# ---------------------------------------------------------------------------
+# Discovered on videoplayback (4), two flavours of the same root cause:
+#   1. Ball: the Tokyo 2020 court has repeated printed ring logos, and the
+#      fine-tuned ball detector consistently mis-fires on them every time the
+#      (static) logo passes its confidence bar.
+#   2. Players: stationary non-playing personnel near the court - referees,
+#      linespeople, ball kids, coaches - get swept into the "far team" bucket
+#      by the homography extrapolation and stay there because they never
+#      move like an active player would.
+# The tell is the same for both: a REAL ball or an ACTIVE player is never in
+# the same ~30cm spot for more than a few seconds - it's either moving or the
+# point/match is over - so any spot that keeps re-triggering across a large
+# FRACTION of the whole video's time span cannot be live gameplay, only a
+# static pattern or a stationary person in the scene. Verified on video 4:
+# 43 ball bins accounted for 69% of "ball" detections, and 62 far-team player
+# bins accounted for 73.5% of "far team" detections - dominant, not a minor
+# edge case to shrug off.
+def filter_static_false_positives(
+    points_df: pd.DataFrame,
+    bin_cm: float = 30.0,
+    min_count: int = 15,
+    min_span_frac: float = 0.15,
+) -> pd.DataFrame:
+    """Drop rows sitting in a spatial bin that (a) fired at least `min_count`
+    times AND (b) those firings span at least `min_span_frac` of the full
+    detected time range - i.e. a location that keeps re-appearing across a
+    large chunk of the whole video, not the ball/a player passing through
+    once or twice. Returns a copy; no-op if points_df is empty."""
+    if len(points_df) == 0:
+        return points_df
+    total_span = points_df["t_s"].max() - points_df["t_s"].min()
+    if total_span <= 0:
+        return points_df
+
+    d = points_df.copy()
+    d["_xb"] = (d["x_cm"] // bin_cm * bin_cm).astype(int)
+    d["_yb"] = (d["y_cm"] // bin_cm * bin_cm).astype(int)
+    stats = d.groupby(["_xb", "_yb"])["t_s"].agg(n="count", t_min="min", t_max="max")
+    stats["span_frac"] = (stats["t_max"] - stats["t_min"]) / total_span
+    bad_bins = set(stats[(stats["n"] >= min_count) & (stats["span_frac"] >= min_span_frac)].index)
+
+    keep_mask = ~d.set_index(["_xb", "_yb"]).index.isin(bad_bins)
+    n_dropped = (~keep_mask).sum()
+    if n_dropped:
+        print(f"  filtered {n_dropped}/{len(d)} detections as static false "
+              f"positives ({len(bad_bins)} hotspot bins - a stationary object/"
+              f"person, not live gameplay)")
+    return d.loc[keep_mask].drop(columns=["_xb", "_yb"])
+
+
+# Backward-compatible alias (ball-specific name used elsewhere/previously).
+filter_static_ball_false_positives = filter_static_false_positives
+
+
+# ---------------------------------------------------------------------------
 # Heatmap rendering (same visual system as generate_position_heatmaps.py)
 # ---------------------------------------------------------------------------
 def draw_court(ax) -> None:
@@ -437,9 +493,19 @@ def render_dual_heatmap(
 def main() -> None:
     df = run_detection()
 
-    ball_xy = df[df["kind"] == "ball"][["x_cm", "y_cm"]].to_numpy()
+    ball_df = filter_static_false_positives(df[df["kind"] == "ball"])
+    ball_xy = ball_df[["x_cm", "y_cm"]].to_numpy()
+    # near-team is NOT filtered: real rotational volleyball positions
+    # legitimately revisit the same court zones for the whole match, so this
+    # filter's own test (static hotspot) is expected, correct behaviour for
+    # active players, not a false-positive tell (verified: applying it here
+    # would discard ~98% of genuinely good near-team data). far-team IS
+    # filtered: those are homography-extrapolated and dominated by
+    # stationary bystanders (referees, linespeople, bench) getting swept
+    # into the bucket - verified 73-87% of "far team" was exactly that.
     near_xy = df[(df["kind"] == "player") & (df["team"] == "near")][["x_cm", "y_cm"]].to_numpy()
-    far_xy = df[(df["kind"] == "player") & (df["team"] == "far")][["x_cm", "y_cm"]].to_numpy()
+    far_df = filter_static_false_positives(df[(df["kind"] == "player") & (df["team"] == "far")])
+    far_xy = far_df[["x_cm", "y_cm"]].to_numpy()
     print(f"\nball samples: {len(ball_xy)}   "
           f"near-team samples: {len(near_xy)}   far-team samples: {len(far_xy)}")
 
